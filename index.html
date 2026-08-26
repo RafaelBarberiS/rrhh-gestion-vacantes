@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Gestión de Vacantes - GastroBA</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <header class="navbar">
+    <div class="logo">GastroBA | RRHH</div>
+    <nav class="nav-links">
+      <button onclick="mostrarSeccion('vista-operativa')" class="nav-btn active" id="btn-nav-operativa">📋 Vista Operativa</button>
+      <button onclick="mostrarSeccion('pendientes-asignacion')" class="nav-btn" id="btn-nav-pendientes">📥 Pendientes de Asignación <span id="badge-pendientes" class="count-badge">0</span></button>
+      <button onclick="mostrarSeccion('configuracion')" class="nav-btn" id="btn-nav-config">⚙️ Configuración (Maestros)</button>
+      <button onclick="mostrarSeccion('simulador-postulante')" class="nav-btn btn-highlight" id="btn-nav-postulante">📱 Formulario General Postulante</button>
+    </nav>
+  </header>
+
+  <main class="container">
+
+    <!-- VISTA OPERATIVA -->
+    <section id="vista-operativa" class="seccion-content active">
+      <div class="top-bar">
+        <h2>Jornada Activa de Vacantes</h2>
+        <div class="actions">
+          <button onclick="agregarNuevaVacante()" class="btn btn-primary">➕ Agregar Vacante</button>
+          <button onclick="guardarCambiosTablaOperativa()" class="btn btn-success">💾 Guardar Cambios en BD</button>
+          <button onclick="reiniciarADatosIniciales()" class="btn btn-secondary">🔄 Reiniciar Demo</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="tabla-operativa">
+          <thead>
+            <tr>
+              <th>Capacitador</th>
+              <th>Regional</th>
+              <th>Zonal</th>
+              <th>Local</th>
+              <th>Puesto / Turno</th>
+              <th>Notas Solicitud</th>
+              <th>Fecha Jornada</th>
+              <th>Hora</th>
+              <th>Estado (Único)</th>
+              <th>Fecha Ingreso</th>
+              <th>Postulante Asignado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="body-tabla-vacantes">
+            <!-- Filas cargadas dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PENDIENTES DE ASIGNACIÓN -->
+    <section id="pendientes-asignacion" class="seccion-content">
+      <div class="top-bar">
+        <h2>📥 Postulantes Pendientes de Asignación</h2>
+        <p class="subtitle">Lista de postulantes que completaron el Formulario General. Asígnalos manualmente a una vacante libre.</p>
+      </div>
+
+      <div id="grid-pendientes" class="grid-pendientes">
+        <!-- Fichas de postulantes pendintes generadas por JS -->
+      </div>
+    </section>
+
+    <!-- CONFIGURACIÓN -->
+    <section id="configuracion" class="seccion-content">
+      <h2>⚙️ Configuración del Sistema (Tablas Maestras)</h2>
+      <p class="subtitle">Gestiona la información base sin selectores cruzados.</p>
+
+      <div class="grid-config">
+        <div class="card-config">
+          <h3>📍 Locales y Direcciones</h3>
+          <form onsubmit="guardarLocal(event)" class="form-mini">
+            <input type="text" id="loc-nombre" placeholder="Nombre Local (ej. Centro 01)" required>
+            <input type="text" id="loc-direccion" placeholder="Dirección exacta (para WhatsApp)" required>
+            <button type="submit" class="btn btn-primary btn-block">+ Agregar Local</button>
+          </form>
+          <ul id="lista-locales" class="list-data"></ul>
+        </div>
+
+        <div class="card-config">
+          <h3>👤 Capacitadores RRHH</h3>
+          <form onsubmit="guardarCapacitador(event)" class="form-mini">
+            <input type="text" id="cap-nombre" placeholder="Nombre completo" required>
+            <button type="submit" class="btn btn-primary btn-block">+ Agregar Capacitador</button>
+          </form>
+          <ul id="lista-capacitadores" class="list-data"></ul>
+        </div>
+
+        <div class="card-config">
+          <h3>⏰ Horarios Predefinidos de Jornada</h3>
+          <form onsubmit="guardarHorario(event)" class="form-mini">
+            <input type="time" id="hor-valor" required>
+            <button type="submit" class="btn btn-primary btn-block">+ Agregar Horario</button>
+          </form>
+          <ul id="lista-horarios" class="list-data"></ul>
+        </div>
+
+        <div class="card-config">
+          <h3>🌍 Regionales y Zonales</h3>
+          <div class="sub-card">
+            <h4>Regionales</h4>
+            <form onsubmit="guardarRegional(event)" class="form-mini flex-row">
+              <input type="text" id="reg-nombre" placeholder="Ej. CABA" required>
+              <button type="submit" class="btn btn-primary">+</button>
+            </form>
+            <ul id="lista-regionales" class="list-data"></ul>
+          </div>
+          <div class="sub-card mt-10">
+            <h4>Zonales</h4>
+            <form onsubmit="guardarZonal(event)" class="form-mini flex-row">
+              <input type="text" id="zon-nombre" placeholder="Ej. Zona Norte" required>
+              <button type="submit" class="btn btn-primary">+</button>
+            </form>
+            <ul id="lista-zonales" class="list-data"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FORMULARIO GENERAL COMPLETO DEL POSTULANTE -->
+    <section id="simulador-postulante" class="seccion-content">
+      <div class="form-card">
+        <h2>📝 Formulario General de Ingreso - Postulantes</h2>
+        <p class="subtitle">Ingresá tus datos completos. Todos los campos son obligatorios.</p>
+
+        <form onsubmit="enviarFormularioPostulante(event)">
+          <div class="form-grid-12">
+            <div>
+              <label>Nombre/s</label>
+              <input type="text" id="post-nombre" placeholder="Juan" required>
+            </div>
+            <div>
+              <label>Apellido/s</label>
+              <input type="text" id="post-apellido" placeholder="Pérez" required>
+            </div>
+            <div>
+              <label>Teléfono Celular</label>
+              <input type="tel" id="post-telefono" placeholder="1112345678" required>
+            </div>
+            <div>
+              <label>Teléfono de Emergencia</label>
+              <input type="tel" id="post-tel-emergencia" placeholder="1187654321" required>
+            </div>
+            <div>
+              <label>Fecha de Nacimiento</label>
+              <input type="date" id="post-fecha-nac" required>
+            </div>
+            <div>
+              <label>Nacionalidad</label>
+              <input type="text" id="post-nacionalidad" placeholder="Argentina" required>
+            </div>
+            <div>
+              <label>CUIL</label>
+              <input type="text" id="post-cuil" placeholder="20-12345678-9" required>
+            </div>
+            <div>
+              <label>Sexo</label>
+              <select id="post-sexo" class="cell-select" required>
+                <option value="">Seleccionar...</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Femenino">Femenino</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div class="col-span-2">
+              <label>Dirección Completa del Domicilio</label>
+              <input type="text" id="post-direccion" placeholder="Av. Siempre Viva 123, Piso 2 Depto B" required>
+            </div>
+            <div>
+              <label>Código Postal (CP)</label>
+              <input type="text" id="post-cp" placeholder="1425" required>
+            </div>
+            <div>
+              <label>Localidad</label>
+              <input type="text" id="post-localidad" placeholder="CABA" required>
+            </div>
+            <div class="col-span-2">
+              <label>Correo Electrónico (E-mail)</label>
+              <input type="email" id="post-email" placeholder="juan.perez@email.com" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success btn-block mt-10">🚀 Enviar Formulario</button>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
