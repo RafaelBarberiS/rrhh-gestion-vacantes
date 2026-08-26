@@ -2,7 +2,11 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#122852" />
     <title>Sistema de Gestión de Vacantes - GastroBA</title>
 
     <!-- CDN de Tailwind CSS -->
@@ -33,84 +37,102 @@
 
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body class="bg-gastro-bg text-slate-800 antialiased min-h-screen">
+  <body class="bg-gastro-bg text-slate-800 antialiased min-h-screen overflow-x-hidden">
+    <a href="#contenido-principal" class="skip-link">Saltar al contenido</a>
+
     <!-- Navbar -->
     <header
-      class="bg-white border-b border-gastro-border px-6 py-3.5 flex justify-between items-center shadow-sm sticky top-0 z-50"
+      class="bg-white border-b border-gastro-border px-4 sm:px-6 py-3 flex justify-between items-center shadow-sm sticky top-0 z-50"
     >
-      <div class="font-extrabold text-xl text-gastro-primary tracking-tight">
+      <div class="font-extrabold text-lg sm:text-xl text-gastro-primary tracking-tight min-w-0">
         GastroBA
         <span
-          class="text-xs font-semibold text-gastro-accent px-2 py-0.5 bg-gastro-subtle rounded-md ml-1"
+          class="text-[10px] sm:text-xs font-semibold text-gastro-accent px-2 py-0.5 bg-gastro-subtle rounded-md ml-1 align-middle"
           >RRHH</span
         >
       </div>
-      <nav class="flex gap-2">
+      <nav
+        class="hidden md:flex gap-2 flex-wrap justify-end"
+        aria-label="Secciones"
+      >
         <button
+          type="button"
           onclick="mostrarSeccion('vista-operativa')"
           class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors text-slate-600 hover:bg-gastro-subtle hover:text-gastro-primary active-nav"
-          id="btn-nav-operativa"
+          data-seccion="vista-operativa"
         >
           📋 Vista Operativa
         </button>
         <button
+          type="button"
           onclick="mostrarSeccion('pendientes-asignacion')"
-          class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors text-slate-600 hover:bg-gastro-subtle hover:text-gastro-primary flex items-center gap-1.5"
-          id="btn-nav-pendientes"
+          class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors text-slate-600 hover:bg-gastro-subtle hover:text-gastro-primary inline-flex items-center gap-1.5"
+          data-seccion="pendientes-asignacion"
         >
           📥 Pendientes
           <span
-            id="badge-pendientes"
-            class="bg-rose-500 text-white rounded-full text-xs font-bold px-2 py-0.5"
+            class="badge-pendientes bg-rose-500 text-white rounded-full text-xs font-bold px-2 py-0.5 min-w-[1.25rem] text-center"
             >0</span
           >
         </button>
         <button
+          type="button"
           onclick="mostrarSeccion('configuracion')"
           class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors text-slate-600 hover:bg-gastro-subtle hover:text-gastro-primary"
-          id="btn-nav-config"
+          data-seccion="configuracion"
         >
           ⚙️ Configuración
         </button>
         <button
+          type="button"
           onclick="mostrarSeccion('simulador-postulante')"
           class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors bg-gastro-accent text-white hover:bg-gastro-primary shadow-sm"
-          id="btn-nav-postulante"
+          data-seccion="simulador-postulante"
         >
           📱 Formulario Ingreso
         </button>
       </nav>
     </header>
 
-    <main class="max-w-[1650px] mx-auto p-6">
+    <main
+      id="contenido-principal"
+      class="max-w-[1650px] mx-auto px-4 py-4 sm:p-6 pb-24 md:pb-6"
+    >
       <!-- VISTA OPERATIVA -->
       <section id="vista-operativa" class="seccion-content block">
-        <div class="flex justify-between items-center mb-5">
-          <div>
-            <h2 class="text-xl font-bold text-gastro-primary">
+        <div
+          class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-5"
+        >
+          <div class="min-w-0">
+            <h2 class="text-lg sm:text-xl font-bold text-gastro-primary">
               Jornada Activa de Vacantes
             </h2>
-            <p class="text-xs text-slate-500">
+            <p class="text-xs text-slate-500 mt-0.5">
               Planilla operativa en tiempo real con vinculación directa de
               postulantes.
             </p>
           </div>
-          <div class="flex gap-2">
+          <div
+            class="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto"
+          >
             <button
+              type="button"
               onclick="agregarNuevaVacante()"
-              class="bg-gastro-accent text-white text-xs font-bold px-3.5 py-2 rounded-md hover:bg-gastro-hover transition shadow-sm"
+              class="bg-gastro-accent text-white text-xs font-bold min-h-[44px] px-3.5 py-2 rounded-md hover:bg-gastro-hover transition shadow-sm"
             >
               ➕ Agregar Vacante
             </button>
             <button
+              type="button"
               onclick="guardarCambiosTablaOperativa()"
-              class="bg-emerald-600 text-white text-xs font-bold px-3.5 py-2 rounded-md hover:bg-emerald-700 transition shadow-sm"
+              class="bg-emerald-600 text-white text-xs font-bold min-h-[44px] px-3.5 py-2 rounded-md hover:bg-emerald-700 transition shadow-sm"
             >
               💾 Guardar Cambios
             </button>
             <button
+              type="button"
               onclick="reiniciarADatosIniciales()"
-              class="bg-slate-500 text-white text-xs font-bold px-3.5 py-2 rounded-md hover:bg-slate-600 transition shadow-sm"
+              class="bg-slate-500 text-white text-xs font-bold min-h-[44px] px-3.5 py-2 rounded-md hover:bg-slate-600 transition shadow-sm"
             >
               🔄 Reiniciar Demo
             </button>
@@ -118,9 +140,9 @@
         </div>
 
         <div
-          class="bg-white border border-gastro-border rounded-xl shadow-sm overflow-x-auto"
+          class="tabla-wrap bg-white border border-gastro-border rounded-xl shadow-sm overflow-x-auto"
         >
-          <table class="w-full text-left border-collapse text-xs">
+          <table class="tabla-vacantes w-full text-left border-collapse text-xs lg:min-w-[1100px]">
             <thead>
               <tr
                 class="bg-gastro-subtle border-b border-gastro-border text-gastro-primary font-bold uppercase tracking-wider text-[11px]"
@@ -152,10 +174,10 @@
       <!-- PENDIENTES DE ASIGNACIÓN -->
       <section id="pendientes-asignacion" class="seccion-content hidden">
         <div class="mb-5">
-          <h2 class="text-xl font-bold text-gastro-primary">
+          <h2 class="text-lg sm:text-xl font-bold text-gastro-primary">
             📥 Postulantes Pendientes de Asignación
           </h2>
-          <p class="text-xs text-slate-500">
+          <p class="text-xs text-slate-500 mt-0.5">
             Postulaciones recibidas mediante el Formulario General. Asígnalas
             manualmente a la vacante correspondiente.
           </p>
@@ -172,10 +194,10 @@
       <!-- CONFIGURACIÓN -->
       <section id="configuracion" class="seccion-content hidden">
         <div class="mb-5">
-          <h2 class="text-xl font-bold text-gastro-primary">
-            ⚙️ Configuración del Sistema (Tablas Maestras)
+          <h2 class="text-lg sm:text-xl font-bold text-gastro-primary">
+            ⚙️ Configuración del Sistema
           </h2>
-          <p class="text-xs text-slate-500">
+          <p class="text-xs text-slate-500 mt-0.5">
             Gestiona los catálogos base del sistema.
           </p>
         </div>
@@ -207,7 +229,7 @@
               />
               <button
                 type="submit"
-                class="bg-gastro-accent text-white text-xs font-bold py-2 rounded-md hover:bg-gastro-primary transition"
+                class="bg-gastro-accent text-white text-xs font-bold min-h-[44px] py-2 rounded-md hover:bg-gastro-primary transition"
               >
                 + Agregar Local
               </button>
@@ -237,7 +259,7 @@
               />
               <button
                 type="submit"
-                class="bg-gastro-accent text-white text-xs font-bold py-2 rounded-md hover:bg-gastro-primary transition"
+                class="bg-gastro-accent text-white text-xs font-bold min-h-[44px] py-2 rounded-md hover:bg-gastro-primary transition"
               >
                 + Agregar Capacitador
               </button>
@@ -261,7 +283,7 @@
               <input type="time" id="hor-valor" class="input-clean" required />
               <button
                 type="submit"
-                class="bg-gastro-accent text-white text-xs font-bold py-2 rounded-md hover:bg-gastro-primary transition"
+                class="bg-gastro-accent text-white text-xs font-bold min-h-[44px] py-2 rounded-md hover:bg-gastro-primary transition"
               >
                 + Agregar Horario
               </button>
@@ -294,7 +316,7 @@
                 />
                 <button
                   type="submit"
-                  class="bg-gastro-accent text-white font-bold px-3 text-xs rounded-md"
+                  class="bg-gastro-accent text-white font-bold min-h-[44px] min-w-[44px] px-3 text-xs rounded-md shrink-0"
                 >
                   +
                 </button>
@@ -321,7 +343,7 @@
                 />
                 <button
                   type="submit"
-                  class="bg-gastro-accent text-white font-bold px-3 text-xs rounded-md"
+                  class="bg-gastro-accent text-white font-bold min-h-[44px] min-w-[44px] px-3 text-xs rounded-md shrink-0"
                 >
                   +
                 </button>
@@ -338,140 +360,206 @@
       <!-- FORMULARIO POSTULANTE -->
       <section id="simulador-postulante" class="seccion-content hidden">
         <div
-          class="bg-white p-8 rounded-2xl border border-gastro-border max-w-3xl mx-auto shadow-sm"
+          class="bg-white p-4 sm:p-6 md:p-8 rounded-2xl border border-gastro-border max-w-3xl mx-auto shadow-sm"
         >
-          <h2 class="text-xl font-bold text-gastro-primary">
-            📝 Formulario General de Ingreso - Postulantes
+          <h2 class="text-lg sm:text-xl font-bold text-gastro-primary">
+            📝 Formulario General de Ingreso
           </h2>
           <p class="text-xs text-slate-500 mb-6">
             Completa tus datos personales para el proceso de selección.
           </p>
 
           <form
+            id="form-postulante"
+            novalidate
             onsubmit="enviarFormularioPostulante(event)"
             class="grid grid-cols-1 md:grid-cols-2 gap-4"
           >
             <div>
-              <label class="label-form">Nombre/s</label>
+              <label class="label-form" for="post-nombre">Nombre/s</label>
               <input
                 type="text"
                 id="post-nombre"
+                name="nombre"
                 placeholder="Juan"
                 class="input-clean"
-                required
+                autocomplete="given-name"
+                maxlength="60"
+                aria-describedby="post-nombre-error"
               />
+              <p id="post-nombre-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div>
-              <label class="label-form">Apellido/s</label>
+              <label class="label-form" for="post-apellido">Apellido/s</label>
               <input
                 type="text"
                 id="post-apellido"
+                name="apellido"
                 placeholder="Pérez"
                 class="input-clean"
-                required
+                autocomplete="family-name"
+                maxlength="60"
+                aria-describedby="post-apellido-error"
               />
+              <p id="post-apellido-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div>
-              <label class="label-form">Teléfono Celular</label>
+              <label class="label-form" for="post-telefono">Teléfono Celular</label>
               <input
-                type="tel"
+                type="text"
                 id="post-telefono"
+                name="telefono"
+                inputmode="numeric"
                 placeholder="1112345678"
                 class="input-clean"
-                required
+                autocomplete="tel"
+                maxlength="15"
+                aria-describedby="post-telefono-error"
               />
+              <p id="post-telefono-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div>
-              <label class="label-form">Teléfono de Emergencia</label>
+              <label class="label-form" for="post-tel-emergencia"
+                >Teléfono de Emergencia</label
+              >
               <input
-                type="tel"
+                type="text"
                 id="post-tel-emergencia"
+                name="tel_emergencia"
+                inputmode="numeric"
                 placeholder="1187654321"
                 class="input-clean"
-                required
+                maxlength="15"
+                aria-describedby="post-tel-emergencia-error"
               />
+              <p id="post-tel-emergencia-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div>
-              <label class="label-form">Fecha de Nacimiento</label>
+              <label class="label-form" for="post-fecha-nac"
+                >Fecha de Nacimiento</label
+              >
               <input
                 type="date"
                 id="post-fecha-nac"
+                name="fecha_nacimiento"
                 class="input-clean"
-                required
+                autocomplete="bday"
+                aria-describedby="post-fecha-nac-error"
               />
+              <p id="post-fecha-nac-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div>
-              <label class="label-form">Nacionalidad</label>
+              <label class="label-form" for="post-nacionalidad">Nacionalidad</label>
               <input
                 type="text"
                 id="post-nacionalidad"
+                name="nacionalidad"
                 placeholder="Argentina"
                 class="input-clean"
-                required
+                maxlength="40"
+                aria-describedby="post-nacionalidad-error"
               />
+              <p id="post-nacionalidad-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div>
-              <label class="label-form">CUIL</label>
+              <label class="label-form" for="post-cuil">CUIL</label>
               <input
                 type="text"
                 id="post-cuil"
+                name="cuil"
+                inputmode="numeric"
                 placeholder="20-12345678-9"
                 class="input-clean"
-                required
+                maxlength="13"
+                aria-describedby="post-cuil-error"
               />
+              <p id="post-cuil-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div>
-              <label class="label-form">Sexo</label>
-              <select id="post-sexo" class="input-clean" required>
+              <label class="label-form" for="post-sexo">Sexo</label>
+              <select
+                id="post-sexo"
+                name="sexo"
+                class="input-clean"
+                aria-describedby="post-sexo-error"
+              >
                 <option value="">Seleccionar...</option>
                 <option value="Masculino">Masculino</option>
                 <option value="Femenino">Femenino</option>
                 <option value="Otro">Otro</option>
               </select>
+              <p id="post-sexo-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div class="md:col-span-2">
-              <label class="label-form">Dirección Completa del Domicilio</label>
+              <label class="label-form" for="post-direccion"
+                >Dirección Completa del Domicilio</label
+              >
               <input
                 type="text"
                 id="post-direccion"
+                name="direccion"
                 placeholder="Av. Corrientes 1234, CABA"
                 class="input-clean"
-                required
+                autocomplete="street-address"
+                maxlength="120"
+                aria-describedby="post-direccion-error"
               />
+              <p id="post-direccion-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div>
-              <label class="label-form">Código Postal (CP)</label>
+              <label class="label-form" for="post-cp">Código Postal (CP)</label>
               <input
                 type="text"
                 id="post-cp"
+                name="cp"
+                inputmode="numeric"
                 placeholder="1425"
                 class="input-clean"
-                required
+                autocomplete="postal-code"
+                maxlength="8"
+                aria-describedby="post-cp-error"
               />
+              <p id="post-cp-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div>
-              <label class="label-form">Localidad</label>
+              <label class="label-form" for="post-localidad">Localidad</label>
               <input
                 type="text"
                 id="post-localidad"
+                name="localidad"
                 placeholder="CABA"
                 class="input-clean"
-                required
+                autocomplete="address-level2"
+                maxlength="60"
+                aria-describedby="post-localidad-error"
               />
+              <p id="post-localidad-error" class="msg-campo" aria-live="polite"></p>
             </div>
             <div class="md:col-span-2">
-              <label class="label-form">Correo Electrónico (E-mail)</label>
+              <label class="label-form" for="post-email"
+                >Correo Electrónico (E-mail)</label
+              >
               <input
-                type="email"
+                type="text"
                 id="post-email"
+                name="email"
+                inputmode="email"
                 placeholder="juan.perez@email.com"
                 class="input-clean"
-                required
+                autocomplete="email"
+                maxlength="80"
+                aria-describedby="post-email-error"
               />
+              <p id="post-email-error" class="msg-campo" aria-live="polite"></p>
             </div>
+            <p
+              id="form-postulante-resumen"
+              class="msg-campo md:col-span-2"
+              aria-live="polite"
+            ></p>
             <button
               type="submit"
-              class="md:col-span-2 mt-4 bg-emerald-600 text-white font-bold py-3 rounded-lg hover:bg-emerald-700 transition shadow"
+              class="md:col-span-2 mt-1 sm:mt-2 bg-emerald-600 text-white font-bold min-h-[48px] py-3 rounded-lg hover:bg-emerald-700 transition shadow"
             >
               🚀 Enviar Formulario
             </button>
@@ -479,6 +567,56 @@
         </div>
       </section>
     </main>
+
+    <nav
+      class="nav-movil md:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gastro-border shadow-[0_-4px_12px_rgba(18,40,82,0.08)] grid grid-cols-4"
+      aria-label="Navegación principal"
+    >
+      <button
+        type="button"
+        onclick="mostrarSeccion('vista-operativa')"
+        class="nav-btn flex flex-col items-center justify-center gap-0.5 min-h-[56px] px-1 py-2 text-[10px] font-semibold text-slate-500 active-nav"
+        data-seccion="vista-operativa"
+      >
+        <span class="text-base leading-none" aria-hidden="true">📋</span>
+        Operativa
+      </button>
+      <button
+        type="button"
+        onclick="mostrarSeccion('pendientes-asignacion')"
+        class="nav-btn relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] px-1 py-2 text-[10px] font-semibold text-slate-500"
+        data-seccion="pendientes-asignacion"
+      >
+        <span class="text-base leading-none" aria-hidden="true">📥</span>
+        <span class="inline-flex items-center gap-1">
+          Pendientes
+          <span
+            class="badge-pendientes bg-rose-500 text-white rounded-full text-[9px] font-bold px-1.5 min-w-[1rem] text-center"
+            >0</span
+          >
+        </span>
+      </button>
+      <button
+        type="button"
+        onclick="mostrarSeccion('configuracion')"
+        class="nav-btn flex flex-col items-center justify-center gap-0.5 min-h-[56px] px-1 py-2 text-[10px] font-semibold text-slate-500"
+        data-seccion="configuracion"
+      >
+        <span class="text-base leading-none" aria-hidden="true">⚙️</span>
+        Config
+      </button>
+      <button
+        type="button"
+        onclick="mostrarSeccion('simulador-postulante')"
+        class="nav-btn flex flex-col items-center justify-center gap-0.5 min-h-[56px] px-1 py-2 text-[10px] font-semibold text-slate-500"
+        data-seccion="simulador-postulante"
+      >
+        <span class="text-base leading-none" aria-hidden="true">📱</span>
+        Ingreso
+      </button>
+    </nav>
+
+    <div id="aviso-sistema" class="aviso-sistema" role="status" aria-live="polite"></div>
 
     <script src="app.js"></script>
   </body>

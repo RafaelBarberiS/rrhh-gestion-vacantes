@@ -1,4 +1,17 @@
 let db = null;
+let avisoTimer = null;
+
+function mostrarAviso(texto, tipo = "ok") {
+  const el = document.getElementById("aviso-sistema");
+  if (!el) return;
+  el.textContent = texto;
+  el.classList.toggle("error", tipo === "error");
+  el.classList.add("visible");
+  clearTimeout(avisoTimer);
+  avisoTimer = setTimeout(() => {
+    el.classList.remove("visible");
+  }, 1000);
+}
 
 async function initDatabase() {
   try {
@@ -22,7 +35,7 @@ async function initDatabase() {
     renderizarTodo();
   } catch (err) {
     console.error("Error al inicializar SQLite:", err);
-    alert("⚠️ No se pudo cargar la base de datos.");
+    mostrarAviso("No se pudo cargar la base", "error");
   }
 }
 
@@ -77,10 +90,9 @@ function guardarCambiosBD() {
 }
 
 function reiniciarADatosIniciales() {
-  if (confirm("¿Reiniciar la demo con datos de prueba?")) {
-    localStorage.removeItem("sqlite_rrhh_db");
-    location.reload();
-  }
+  localStorage.removeItem("sqlite_rrhh_db");
+  mostrarAviso("Demo reiniciada");
+  setTimeout(() => location.reload(), 1000);
 }
 
 function renderizarTodo() {
@@ -118,7 +130,10 @@ function renderizarTablaVacantes() {
   `;
 
   const res = db.exec(sql);
-  if (!res.length) return;
+  if (!res.length) {
+    tbody.innerHTML = `<tr class="fila-vacia"><td colspan="12" class="p-8 text-center text-slate-400 italic">No hay vacantes. Agregá una para comenzar la jornada.</td></tr>`;
+    return;
+  }
 
   res[0].values.forEach((row) => {
     const [
@@ -149,55 +164,51 @@ function renderizarTablaVacantes() {
     const tieneHuella = estado === "HUELLA" || estado === "ENVIADO";
 
     tr.innerHTML = `
-      <td class="p-2 border-r border-gastro-border">${buildSelect("cap", listCap, capId)}</td>
-      <td class="p-2 border-r border-gastro-border">${buildSelect("reg", listReg, regId)}</td>
-      <td class="p-2 border-r border-gastro-border">${buildSelect("zon", listZon, zonId)}</td>
-      <td class="p-2 border-r border-gastro-border">${buildSelect("loc", listLoc, locId)}</td>
-      <td class="p-2 border-r border-gastro-border">
-        <select class="cell-select field-tipo font-bold">
-          <option value="PART" ${tipo === "PART" ? "selected" : ""}>PART</option>
-          <option value="FULL" ${tipo === "FULL" ? "selected" : ""}>FULL</option>
-          <option value="GT" ${tipo === "GT" ? "selected" : ""}>GT</option>
-          <option value="ET" ${tipo === "ET" ? "selected" : ""}>ET</option>
-        </select>
-        <select class="cell-select field-turno mt-1">
-          <option value="ROTA" ${!turno || turno === "ROTA" ? "selected" : ""}>ROTA</option>
-          <option value="MAÑANA" ${turno === "MAÑANA" ? "selected" : ""}>MAÑANA</option>
-          <option value="MEDIO" ${turno === "MEDIO" ? "selected" : ""}>MEDIO</option>
-          <option value="TARDE" ${turno === "TARDE" ? "selected" : ""}>TARDE</option>
-          <option value="NOCHE" ${turno === "NOCHE" ? "selected" : ""}>NOCHE</option>
-        </select>
+      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Capacitador">${buildSelect("cap", listCap, capId)}</td>
+      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Regional">${buildSelect("reg", listReg, regId)}</td>
+      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Zonal">${buildSelect("zon", listZon, zonId)}</td>
+      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Local">${buildSelect("loc", listLoc, locId)}</td>
+      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Puesto / Turno">
+        <div class="grid grid-cols-2 gap-1 lg:block">
+          <select class="cell-select field-tipo font-bold">
+            <option value="PART" ${tipo === "PART" ? "selected" : ""}>PART</option>
+            <option value="FULL" ${tipo === "FULL" ? "selected" : ""}>FULL</option>
+            <option value="GT" ${tipo === "GT" ? "selected" : ""}>GT</option>
+            <option value="ET" ${tipo === "ET" ? "selected" : ""}>ET</option>
+          </select>
+          <select class="cell-select field-turno lg:mt-1">
+            <option value="ROTA" ${!turno || turno === "ROTA" ? "selected" : ""}>ROTA</option>
+            <option value="MAÑANA" ${turno === "MAÑANA" ? "selected" : ""}>MAÑANA</option>
+            <option value="MEDIO" ${turno === "MEDIO" ? "selected" : ""}>MEDIO</option>
+            <option value="TARDE" ${turno === "TARDE" ? "selected" : ""}>TARDE</option>
+            <option value="NOCHE" ${turno === "NOCHE" ? "selected" : ""}>NOCHE</option>
+          </select>
+        </div>
       </td>
-      <td class="p-2 border-r border-gastro-border"><input type="text" class="cell-input field-notas" value="${notas || ""}"></td>
-      <td class="p-2 border-r border-gastro-border"><input type="date" class="cell-input field-fecha" value="${fecha || ""}"></td>
-      <td class="p-2 border-r border-gastro-border">${buildSelect("hora", listHor, hora, true)}</td>
-      <td class="p-2 border-r border-gastro-border text-center">
-        <select class="select-estado ${estado} field-estado" onchange="validarEstadoDirecto(this, '${estado}')">
+      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Notas"><input type="text" class="cell-input field-notas" value="${notas || ""}"></td>
+      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Fecha jornada"><input type="date" class="cell-input field-fecha" value="${fecha || ""}"></td>
+      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Hora">${buildSelect("hora", listHor, hora, true)}</td>
+      <td class="p-2 lg:border-r lg:border-gastro-border lg:text-center" data-label="Estado">
+        <select class="select-estado ${estado} field-estado" onchange="validarEstadoDirecto(this)">
           <option value="PENDIENTE" ${estado === "PENDIENTE" ? "selected" : ""}>PENDIENTE</option>
           <option value="PRESENTE" ${estado === "PRESENTE" ? "selected" : ""}>PRESENTE</option>
           <option value="HUELLA" ${estado === "HUELLA" ? "selected" : ""}>HUELLA</option>
-          <option value="ENVIADO" ${estado === "ENVIADO" ? "selected" : ""} ${estado !== "HUELLA" ? "disabled" : ""}>
-            ENVIADO ${estado !== "HUELLA" ? "(Req. HUELLA)" : ""}
-          </option>
+          <option value="ENVIADO" ${estado === "ENVIADO" ? "selected" : ""}>ENVIADO</option>
         </select>
       </td>
-      <td class="p-2 border-r border-gastro-border">
+      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Fecha ingreso">
         <input type="date" class="cell-input field-fecha-ingreso" value="${fechaIngreso || ""}">
       </td>
-      <td class="p-2 border-r border-gastro-border">
+      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Postulante">
         ${pNom ? `<div class="font-bold text-gastro-primary">${pNom} ${pApe}</div><div class="text-[10px] text-slate-500">Tel: ${pTel} | CUIL: ${pCuil}</div><div class="text-[9px] text-emerald-600 font-bold">Alta: ${pAltas}</div>` : '<span class="text-slate-400 italic">Sin postulante</span>'}
       </td>
-      <td class="p-2">
-        <div class="flex gap-1 justify-center whitespace-nowrap">
-          <button class="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-blue-700" onclick="copiarMensajeCitacion(${id})">📋 Citación</button>
-          
-          ${tieneHuella && pNom ? `<button class="bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-emerald-700" onclick="copiarAvisoGerente(${id})">📲 Gerente</button>` : ""}
-          
-          ${pNom ? `<button class="bg-amber-600 text-white text-[10px] font-bold px-1.5 py-1 rounded hover:bg-amber-700" onclick="reasignarPostulante(${id}, ${pId})">🔄</button>` : ""}
-          
-          <button class="bg-slate-200 text-slate-700 text-[10px] font-bold px-1.5 py-1 rounded hover:bg-rose-100 hover:text-rose-600" onclick="eliminarVacante(${id})">🗑️</button>
-          
-          ${pNom ? `<button class="bg-slate-200 text-slate-700 text-[10px] font-bold px-1.5 py-1 rounded hover:bg-slate-300" onclick="liberarVacante(${id})">Liberar</button>` : ""}
+      <td class="p-2" data-label="Acciones">
+        <div class="acciones-vacante flex flex-wrap gap-1 justify-center">
+          <button type="button" class="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-blue-700" onclick="copiarMensajeCitacion(${id})">📋 Citación</button>
+          ${tieneHuella && pNom ? `<button type="button" class="bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-emerald-700" onclick="copiarAvisoGerente(${id})">📲 Gerente</button>` : ""}
+          ${pNom ? `<button type="button" class="bg-amber-600 text-white text-[10px] font-bold px-1.5 py-1 rounded hover:bg-amber-700" onclick="reasignarPostulante(${id}, ${pId})">🔄 Reasignar</button>` : ""}
+          <button type="button" class="bg-slate-200 text-slate-700 text-[10px] font-bold px-1.5 py-1 rounded hover:bg-rose-100 hover:text-rose-600" onclick="eliminarVacante(${id})">🗑️ Eliminar</button>
+          ${pNom ? `<button type="button" class="bg-slate-200 text-slate-700 text-[10px] font-bold px-1.5 py-1 rounded hover:bg-slate-300" onclick="liberarVacante(${id})">Liberar</button>` : ""}
         </div>
       </td>
     `;
@@ -215,22 +226,13 @@ function buildSelect(cls, list, selectedVal, isValueVal = false) {
   return `<select class="cell-select field-${cls}">${options}</select>`;
 }
 
-function validarEstadoDirecto(selectEl, estadoPrevio) {
-  const nuevoVal = selectEl.value;
-  if (nuevoVal === "ENVIADO" && estadoPrevio !== "HUELLA") {
-    alert(
-      "⚠️ Regla: No se puede cambiar a ENVIADO sin estar previamente en HUELLA.",
-    );
-    selectEl.value = estadoPrevio;
-    return;
-  }
-  selectEl.className = `select-estado ${nuevoVal} field-estado`;
+function validarEstadoDirecto(selectEl) {
+  selectEl.className = `select-estado ${selectEl.value} field-estado`;
 }
 
 // PENDIENTES DE ASIGNACIÓN
 function renderizarPendientes() {
   const container = document.getElementById("grid-pendientes");
-  const badge = document.getElementById("badge-pendientes");
   if (!container) return;
   container.innerHTML = "";
 
@@ -244,7 +246,9 @@ function renderizarPendientes() {
 
   const res = db.exec(sql);
   const total = res.length ? res[0].values.length : 0;
-  if (badge) badge.innerText = total;
+  document.querySelectorAll(".badge-pendientes").forEach((el) => {
+    el.innerText = total;
+  });
 
   if (!total) {
     container.innerHTML = `<div class="col-span-full text-center text-slate-400 py-10 italic">🎉 ¡No hay postulantes pendientes! Todos están asignados.</div>`;
@@ -286,11 +290,11 @@ function renderizarPendientes() {
 
     const card = document.createElement("div");
     card.className =
-      "bg-white p-5 rounded-xl border border-gastro-border shadow-sm flex flex-col justify-between";
+      "bg-white p-4 sm:p-5 rounded-xl border border-gastro-border shadow-sm flex flex-col justify-between min-w-0";
     card.innerHTML = `
       <div>
         <h3 class="font-bold text-gastro-primary text-base border-b border-slate-100 pb-2 mb-2">${nom} ${ape}</h3>
-        <div class="text-xs text-slate-600 space-y-1 mb-4">
+        <div class="text-xs text-slate-600 space-y-1 mb-4 break-words">
           <div><b>📞 Tel:</b> ${tel} | <b>Emergencia:</b> ${telEmerg || "-"}</div>
           <div><b>🆔 CUIL:</b> ${cuil} | <b>Sexo:</b> ${sexo || "-"}</div>
           <div><b>🎂 Nacimiento:</b> ${fNac || "-"} | <b>Nacionalidad:</b> ${nac || "-"}</div>
@@ -303,7 +307,7 @@ function renderizarPendientes() {
         <select id="select-vacante-pend-${pId}" class="cell-select">
           ${optionsVacantes}
         </select>
-        <button class="bg-gastro-accent text-white text-xs font-bold py-2 rounded-md hover:bg-gastro-primary transition" onclick="asignarPostulanteManual(${pId})">📌 Asignar a Vacante</button>
+        <button type="button" class="bg-gastro-accent text-white text-xs font-bold min-h-[44px] py-2 rounded-md hover:bg-gastro-primary transition" onclick="asignarPostulanteManual(${pId})">📌 Asignar a Vacante</button>
       </div>
     `;
     container.appendChild(card);
@@ -314,7 +318,7 @@ function asignarPostulanteManual(postulanteId) {
   const select = document.getElementById(`select-vacante-pend-${postulanteId}`);
   const vacanteId = select ? select.value : null;
 
-  if (!vacanteId) return alert("⚠️ Selecciona una vacante libre.");
+  if (!vacanteId) return mostrarAviso("Elegí una vacante libre", "error");
 
   db.run("UPDATE vacantes SET postulante_id = ? WHERE id = ?", [
     postulanteId,
@@ -322,7 +326,7 @@ function asignarPostulanteManual(postulanteId) {
   ]);
   guardarCambiosBD();
   renderizarTodo();
-  alert(`✅ Postulante asignado a la Vacante #${vacanteId}.`);
+  mostrarAviso("Postulante asignado");
 }
 
 function reasignarPostulante(vacanteActualId, postulanteId) {
@@ -337,7 +341,7 @@ function reasignarPostulante(vacanteActualId, postulanteId) {
   );
 
   if (!resVac.length || !resVac[0].values.length) {
-    return alert("⚠️ No hay otras vacantes libres disponibles.");
+    return mostrarAviso("No hay vacantes libres", "error");
   }
 
   let promptText = "Ingresa el ID de la nueva vacante:\n\n";
@@ -359,26 +363,266 @@ function reasignarPostulante(vacanteActualId, postulanteId) {
 
   guardarCambiosBD();
   renderizarTodo();
-  alert(`🔄 Reasignado a la Vacante #${nuevaVacanteId}.`);
+  mostrarAviso("Postulante reasignado");
 }
 
-// FORMULARIO DE INGRESO
+// FORMULARIO DE INGRESO — validación en vivo
+const IDS_CAMPOS_POSTULANTE = [
+  "post-nombre",
+  "post-apellido",
+  "post-telefono",
+  "post-tel-emergencia",
+  "post-fecha-nac",
+  "post-nacionalidad",
+  "post-cuil",
+  "post-sexo",
+  "post-direccion",
+  "post-cp",
+  "post-localidad",
+  "post-email",
+];
+
+const REGEX_NOMBRE = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,60}$/;
+const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function soloDigitos(valor) {
+  return (valor || "").replace(/\D/g, "");
+}
+
+function edadDesdeFecha(fechaStr) {
+  const fecha = new Date(`${fechaStr}T00:00:00`);
+  if (Number.isNaN(fecha.getTime())) return null;
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - fecha.getFullYear();
+  const mes = hoy.getMonth() - fecha.getMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < fecha.getDate())) edad -= 1;
+  return edad;
+}
+
+function esCuilValido(cuil) {
+  const n = soloDigitos(cuil);
+  if (n.length !== 11) return false;
+  const prefijosOk = ["20", "23", "24", "27", "30", "33"];
+  if (!prefijosOk.includes(n.slice(0, 2))) return false;
+  const multiplicadores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  let suma = 0;
+  for (let i = 0; i < 10; i++) suma += Number(n[i]) * multiplicadores[i];
+  let digito = 11 - (suma % 11);
+  if (digito === 11) digito = 0;
+  if (digito === 10) return false;
+  return digito === Number(n[10]);
+}
+
+function formatearCuil(valor) {
+  const n = soloDigitos(valor).slice(0, 11);
+  if (n.length <= 2) return n;
+  if (n.length <= 10) return `${n.slice(0, 2)}-${n.slice(2)}`;
+  return `${n.slice(0, 2)}-${n.slice(2, 10)}-${n.slice(10)}`;
+}
+
+function errorCampoPostulante(id, valor) {
+  const texto = (valor || "").trim();
+  const tel = soloDigitos(document.getElementById("post-telefono")?.value || "");
+  const telEmerg = soloDigitos(
+    document.getElementById("post-tel-emergencia")?.value || "",
+  );
+
+  switch (id) {
+    case "post-nombre":
+      if (!texto) return "Ingresá tu nombre.";
+      if (!REGEX_NOMBRE.test(texto))
+        return "Usá solo letras, espacios o guiones (mínimo 2).";
+      return "";
+    case "post-apellido":
+      if (!texto) return "Ingresá tu apellido.";
+      if (!REGEX_NOMBRE.test(texto))
+        return "Usá solo letras, espacios o guiones (mínimo 2).";
+      return "";
+    case "post-telefono":
+      if (!tel) return "Ingresá tu celular.";
+      if (tel.length < 10 || tel.length > 13)
+        return "El celular debe tener entre 10 y 13 dígitos.";
+      return "";
+    case "post-tel-emergencia":
+      if (!telEmerg) return "Ingresá un teléfono de emergencia.";
+      if (telEmerg.length < 10 || telEmerg.length > 13)
+        return "Debe tener entre 10 y 13 dígitos.";
+      if (tel && tel === telEmerg)
+        return "Debe ser distinto al celular del postulante.";
+      return "";
+    case "post-fecha-nac": {
+      if (!texto) return "Indicá tu fecha de nacimiento.";
+      const edad = edadDesdeFecha(texto);
+      if (edad === null) return "La fecha no es válida.";
+      if (edad < 16) return "Debés tener al menos 16 años.";
+      if (edad > 80) return "Revisá la fecha: la edad no parece correcta.";
+      return "";
+    }
+    case "post-nacionalidad":
+      if (!texto) return "Ingresá tu nacionalidad.";
+      if (!REGEX_NOMBRE.test(texto))
+        return "Usá solo letras (mínimo 2 caracteres).";
+      return "";
+    case "post-cuil":
+      if (!soloDigitos(texto)) return "Ingresá tu CUIL.";
+      if (soloDigitos(texto).length !== 11)
+        return "El CUIL debe tener 11 dígitos (ej. 20-12345678-9).";
+      if (!esCuilValido(texto))
+        return "El CUIL no es válido. Revisá el número.";
+      return "";
+    case "post-sexo":
+      if (!texto) return "Seleccioná una opción.";
+      return "";
+    case "post-direccion":
+      if (!texto) return "Ingresá tu domicilio.";
+      if (texto.length < 8)
+        return "La dirección es demasiado corta (calle y número).";
+      return "";
+    case "post-cp": {
+      const cp = soloDigitos(texto);
+      if (!cp) return "Ingresá el código postal.";
+      if (cp.length < 4 || cp.length > 8)
+        return "El CP argentino tiene entre 4 y 8 dígitos.";
+      return "";
+    }
+    case "post-localidad":
+      if (!texto) return "Ingresá la localidad.";
+      if (texto.length < 2) return "La localidad es demasiado corta.";
+      return "";
+    case "post-email":
+      if (!texto) return "Ingresá tu correo electrónico.";
+      if (!REGEX_EMAIL.test(texto.toLowerCase()))
+        return "El formato del email no es válido.";
+      return "";
+    default:
+      return "";
+  }
+}
+
+function pintarEstadoCampo(el, error, { mostrarOk = true } = {}) {
+  const msg = document.getElementById(`${el.id}-error`);
+  el.classList.remove("input-error", "input-ok");
+
+  if (error) {
+    el.classList.add("input-error");
+    el.setAttribute("aria-invalid", "true");
+    if (msg) msg.textContent = error;
+    return;
+  }
+
+  el.setAttribute("aria-invalid", "false");
+  if (msg) msg.textContent = "";
+  if (mostrarOk && String(el.value || "").trim()) el.classList.add("input-ok");
+}
+
+function validarCampoPostulante(el, { forzar = false } = {}) {
+  if (!el) return true;
+  if (!forzar && el.dataset.touched !== "1") {
+    pintarEstadoCampo(el, "", { mostrarOk: false });
+    return true;
+  }
+  const error = errorCampoPostulante(el.id, el.value);
+  pintarEstadoCampo(el, error);
+  return !error;
+}
+
+function validarFormularioPostulanteCompleto() {
+  let primeroInvalido = null;
+  let ok = true;
+
+  IDS_CAMPOS_POSTULANTE.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.dataset.touched = "1";
+    const valido = validarCampoPostulante(el, { forzar: true });
+    if (!valido && !primeroInvalido) primeroInvalido = el;
+    if (!valido) ok = false;
+  });
+
+  const resumen = document.getElementById("form-postulante-resumen");
+  if (!ok) {
+    if (resumen)
+      resumen.textContent = "Revisá los campos marcados antes de enviar.";
+    primeroInvalido?.focus();
+  } else if (resumen) {
+    resumen.textContent = "";
+  }
+
+  return ok;
+}
+
+function resetearValidacionFormulario(form) {
+  IDS_CAMPOS_POSTULANTE.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    delete el.dataset.touched;
+    pintarEstadoCampo(el, "", { mostrarOk: false });
+  });
+  const resumen = document.getElementById("form-postulante-resumen");
+  if (resumen) resumen.textContent = "";
+  form?.reset();
+}
+
+function initValidacionFormularioPostulante() {
+  const form = document.getElementById("form-postulante");
+  if (!form) return;
+
+  IDS_CAMPOS_POSTULANTE.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    const alEscribir = () => {
+      if (id === "post-cuil") {
+        const cursorAlFinal =
+          el.selectionStart === el.value.length &&
+          el.selectionEnd === el.value.length;
+        el.value = formatearCuil(el.value);
+        if (cursorAlFinal) el.setSelectionRange(el.value.length, el.value.length);
+      }
+      if (id === "post-telefono" || id === "post-tel-emergencia") {
+        el.value = soloDigitos(el.value).slice(0, 13);
+      }
+      if (id === "post-cp") {
+        el.value = soloDigitos(el.value).slice(0, 8);
+      }
+      if (el.dataset.touched === "1") validarCampoPostulante(el, { forzar: true });
+      if (id === "post-telefono" || id === "post-tel-emergencia") {
+        const otroId =
+          id === "post-telefono" ? "post-tel-emergencia" : "post-telefono";
+        const otro = document.getElementById(otroId);
+        if (otro?.dataset.touched === "1")
+          validarCampoPostulante(otro, { forzar: true });
+      }
+    };
+
+    el.addEventListener("input", alEscribir);
+    el.addEventListener("change", alEscribir);
+    el.addEventListener("blur", () => {
+      el.dataset.touched = "1";
+      validarCampoPostulante(el, { forzar: true });
+    });
+  });
+}
+
 function enviarFormularioPostulante(e) {
   if (e) e.preventDefault();
   if (!db) return;
+  if (!validarFormularioPostulanteCompleto()) return;
 
-  const nombre = document.getElementById("post-nombre").value;
-  const apellido = document.getElementById("post-apellido").value;
-  const telefono = document.getElementById("post-telefono").value;
-  const telEmergencia = document.getElementById("post-tel-emergencia").value;
+  const nombre = document.getElementById("post-nombre").value.trim();
+  const apellido = document.getElementById("post-apellido").value.trim();
+  const telefono = soloDigitos(document.getElementById("post-telefono").value);
+  const telEmergencia = soloDigitos(
+    document.getElementById("post-tel-emergencia").value,
+  );
   const fechaNac = document.getElementById("post-fecha-nac").value;
-  const nacionalidad = document.getElementById("post-nacionalidad").value;
-  const cuil = document.getElementById("post-cuil").value;
+  const nacionalidad = document.getElementById("post-nacionalidad").value.trim();
+  const cuil = formatearCuil(document.getElementById("post-cuil").value);
   const sexo = document.getElementById("post-sexo").value;
-  const direccion = document.getElementById("post-direccion").value;
-  const cp = document.getElementById("post-cp").value;
-  const localidad = document.getElementById("post-localidad").value;
-  const email = document.getElementById("post-email").value;
+  const direccion = document.getElementById("post-direccion").value.trim();
+  const cp = soloDigitos(document.getElementById("post-cp").value);
+  const localidad = document.getElementById("post-localidad").value.trim();
+  const email = document.getElementById("post-email").value.trim().toLowerCase();
 
   const ahora = new Date();
   const altasRrhh =
@@ -409,9 +653,9 @@ function enviarFormularioPostulante(e) {
   );
 
   guardarCambiosBD();
-  alert("✅ ¡Formulario enviado con éxito!");
+  mostrarAviso("Formulario enviado");
 
-  e.target.reset();
+  resetearValidacionFormulario(e.target);
   mostrarSeccion("pendientes-asignacion");
 }
 
@@ -437,7 +681,7 @@ function copiarTextoAlPortapapeles(texto) {
 
 function copiarMensajeCitacion(vacanteId) {
   const tr = document.querySelector(`tr[data-vacante-id="${vacanteId}"]`);
-  if (!tr) return alert("Error al localizar la fila.");
+  if (!tr) return mostrarAviso("No se encontró la vacante", "error");
 
   const locId = tr.querySelector(".field-loc").value;
   const puesto = tr.querySelector(".field-tipo").value;
@@ -503,7 +747,7 @@ ${horarioPrimerDia}`;
 
 function copiarAvisoGerente(vacanteId) {
   const tr = document.querySelector(`tr[data-vacante-id="${vacanteId}"]`);
-  if (!tr) return alert("Error al localizar la fila.");
+  if (!tr) return mostrarAviso("No se encontró la vacante", "error");
 
   const locId = tr.querySelector(".field-loc").value;
   const puesto = tr.querySelector(".field-tipo").value;
@@ -586,7 +830,9 @@ function eliminarVacante(id) {
 
 function guardarCambiosTablaOperativa() {
   if (!db) return;
-  const rows = document.querySelectorAll("#body-tabla-vacantes tr");
+  const rows = document.querySelectorAll(
+    "#body-tabla-vacantes tr[data-vacante-id]",
+  );
 
   rows.forEach((tr) => {
     const id = tr.dataset.vacanteId;
@@ -737,17 +983,19 @@ function mostrarSeccion(id) {
   document
     .querySelectorAll(".seccion-content")
     .forEach((s) => s.classList.add("hidden"));
-  document
-    .querySelectorAll(".nav-btn")
-    .forEach((b) => b.classList.remove("active-nav"));
 
   const target = document.getElementById(id);
   if (target) target.classList.remove("hidden");
 
-  const btnNav = document.querySelector(`[onclick="mostrarSeccion('${id}')"]`);
-  if (btnNav) btnNav.classList.add("active-nav");
+  document.querySelectorAll(".nav-btn").forEach((b) => {
+    b.classList.toggle("active-nav", b.dataset.seccion === id);
+  });
 
+  window.scrollTo({ top: 0, behavior: "smooth" });
   renderizarTodo();
 }
 
-window.addEventListener("DOMContentLoaded", initDatabase);
+window.addEventListener("DOMContentLoaded", () => {
+  initValidacionFormularioPostulante();
+  initDatabase();
+});
