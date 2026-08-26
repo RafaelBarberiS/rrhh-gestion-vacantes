@@ -1,200 +1,485 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Gestión de Vacantes - GastroBA</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema de Gestión de Vacantes - GastroBA</title>
 
-  <!-- Navbar -->
-  <header class="navbar">
-    <div class="logo">GastroBA | RRHH</div>
-    <nav class="nav-links">
-      <button onclick="mostrarSeccion('vista-operativa')" class="nav-btn active" id="btn-nav-operativa">📋 Vista Operativa</button>
-      <button onclick="mostrarSeccion('pendientes-asignacion')" class="nav-btn" id="btn-nav-pendientes">📥 Pendientes de Asignación <span id="badge-pendientes" class="count-badge">0</span></button>
-      <button onclick="mostrarSeccion('configuracion')" class="nav-btn" id="btn-nav-config">⚙️ Configuración (Maestros)</button>
-      <button onclick="mostrarSeccion('simulador-postulante')" class="nav-btn btn-highlight" id="btn-nav-postulante">📱 Formulario General Postulante</button>
-    </nav>
-  </header>
+    <!-- CDN de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
-  <main class="container">
+    <!-- Configuración de la Paleta GastroBA en Tailwind -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              gastro: {
+                primary: "#122852",
+                accent: "#2160C4",
+                hover: "#1E3A75",
+                bg: "#F8FAFC",
+                subtle: "#F0F4FA",
+                border: "#D8E3F5",
+              },
+            },
+          },
+        },
+      };
+    </script>
 
-    <!-- VISTA OPERATIVA -->
-    <section id="vista-operativa" class="seccion-content active">
-      <div class="top-bar">
-        <h2>Jornada Activa de Vacantes</h2>
-        <div class="actions">
-          <button onclick="agregarNuevaVacante()" class="btn btn-primary">➕ Agregar Vacante</button>
-          <button onclick="guardarCambiosTablaOperativa()" class="btn btn-success">💾 Guardar Cambios en BD</button>
-          <button onclick="reiniciarADatosIniciales()" class="btn btn-secondary">🔄 Reiniciar Demo</button>
-        </div>
+    <!-- Carga de sql.js (SQLite Wasm) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="bg-gastro-bg text-slate-800 antialiased min-h-screen">
+    <!-- Navbar -->
+    <header
+      class="bg-white border-b border-gastro-border px-6 py-3.5 flex justify-between items-center shadow-sm sticky top-0 z-50"
+    >
+      <div class="font-extrabold text-xl text-gastro-primary tracking-tight">
+        GastroBA
+        <span
+          class="text-xs font-semibold text-gastro-accent px-2 py-0.5 bg-gastro-subtle rounded-md ml-1"
+          >RRHH</span
+        >
       </div>
+      <nav class="flex gap-2">
+        <button
+          onclick="mostrarSeccion('vista-operativa')"
+          class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors text-slate-600 hover:bg-gastro-subtle hover:text-gastro-primary active-nav"
+          id="btn-nav-operativa"
+        >
+          📋 Vista Operativa
+        </button>
+        <button
+          onclick="mostrarSeccion('pendientes-asignacion')"
+          class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors text-slate-600 hover:bg-gastro-subtle hover:text-gastro-primary flex items-center gap-1.5"
+          id="btn-nav-pendientes"
+        >
+          📥 Pendientes
+          <span
+            id="badge-pendientes"
+            class="bg-rose-500 text-white rounded-full text-xs font-bold px-2 py-0.5"
+            >0</span
+          >
+        </button>
+        <button
+          onclick="mostrarSeccion('configuracion')"
+          class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors text-slate-600 hover:bg-gastro-subtle hover:text-gastro-primary"
+          id="btn-nav-config"
+        >
+          ⚙️ Configuración
+        </button>
+        <button
+          onclick="mostrarSeccion('simulador-postulante')"
+          class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors bg-gastro-accent text-white hover:bg-gastro-primary shadow-sm"
+          id="btn-nav-postulante"
+        >
+          📱 Formulario Ingreso
+        </button>
+      </nav>
+    </header>
 
-      <div class="table-responsive">
-        <table class="tabla-operativa">
-          <thead>
-            <tr>
-              <th>Capacitador</th>
-              <th>Regional</th>
-              <th>Zonal</th>
-              <th>Local</th>
-              <th>Puesto / Turno</th>
-              <th>Notas Solicitud</th>
-              <th>Fecha Jornada</th>
-              <th>Hora</th>
-              <th>Estado (Único)</th>
-              <th>Fecha Ingreso</th>
-              <th>Postulante Asignado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="body-tabla-vacantes">
-            <!-- Filas cargadas dinámicamente -->
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- PENDIENTES DE ASIGNACIÓN -->
-    <section id="pendientes-asignacion" class="seccion-content">
-      <div class="top-bar">
-        <h2>📥 Postulantes Pendientes de Asignación</h2>
-        <p class="subtitle">Lista de postulantes que completaron el Formulario General. Asígnalos manualmente a una vacante libre.</p>
-      </div>
-
-      <div id="grid-pendientes" class="grid-pendientes">
-        <!-- Fichas de postulantes pendintes generadas por JS -->
-      </div>
-    </section>
-
-    <!-- CONFIGURACIÓN -->
-    <section id="configuracion" class="seccion-content">
-      <h2>⚙️ Configuración del Sistema (Tablas Maestras)</h2>
-      <p class="subtitle">Gestiona la información base sin selectores cruzados.</p>
-
-      <div class="grid-config">
-        <div class="card-config">
-          <h3>📍 Locales y Direcciones</h3>
-          <form onsubmit="guardarLocal(event)" class="form-mini">
-            <input type="text" id="loc-nombre" placeholder="Nombre Local (ej. Centro 01)" required>
-            <input type="text" id="loc-direccion" placeholder="Dirección exacta (para WhatsApp)" required>
-            <button type="submit" class="btn btn-primary btn-block">+ Agregar Local</button>
-          </form>
-          <ul id="lista-locales" class="list-data"></ul>
-        </div>
-
-        <div class="card-config">
-          <h3>👤 Capacitadores RRHH</h3>
-          <form onsubmit="guardarCapacitador(event)" class="form-mini">
-            <input type="text" id="cap-nombre" placeholder="Nombre completo" required>
-            <button type="submit" class="btn btn-primary btn-block">+ Agregar Capacitador</button>
-          </form>
-          <ul id="lista-capacitadores" class="list-data"></ul>
-        </div>
-
-        <div class="card-config">
-          <h3>⏰ Horarios Predefinidos de Jornada</h3>
-          <form onsubmit="guardarHorario(event)" class="form-mini">
-            <input type="time" id="hor-valor" required>
-            <button type="submit" class="btn btn-primary btn-block">+ Agregar Horario</button>
-          </form>
-          <ul id="lista-horarios" class="list-data"></ul>
-        </div>
-
-        <div class="card-config">
-          <h3>🌍 Regionales y Zonales</h3>
-          <div class="sub-card">
-            <h4>Regionales</h4>
-            <form onsubmit="guardarRegional(event)" class="form-mini flex-row">
-              <input type="text" id="reg-nombre" placeholder="Ej. CABA" required>
-              <button type="submit" class="btn btn-primary">+</button>
-            </form>
-            <ul id="lista-regionales" class="list-data"></ul>
+    <main class="max-w-[1650px] mx-auto p-6">
+      <!-- VISTA OPERATIVA -->
+      <section id="vista-operativa" class="seccion-content block">
+        <div class="flex justify-between items-center mb-5">
+          <div>
+            <h2 class="text-xl font-bold text-gastro-primary">
+              Jornada Activa de Vacantes
+            </h2>
+            <p class="text-xs text-slate-500">
+              Planilla operativa en tiempo real con vinculación directa de
+              postulantes.
+            </p>
           </div>
-          <div class="sub-card mt-10">
-            <h4>Zonales</h4>
-            <form onsubmit="guardarZonal(event)" class="form-mini flex-row">
-              <input type="text" id="zon-nombre" placeholder="Ej. Zona Norte" required>
-              <button type="submit" class="btn btn-primary">+</button>
-            </form>
-            <ul id="lista-zonales" class="list-data"></ul>
+          <div class="flex gap-2">
+            <button
+              onclick="agregarNuevaVacante()"
+              class="bg-gastro-accent text-white text-xs font-bold px-3.5 py-2 rounded-md hover:bg-gastro-hover transition shadow-sm"
+            >
+              ➕ Agregar Vacante
+            </button>
+            <button
+              onclick="guardarCambiosTablaOperativa()"
+              class="bg-emerald-600 text-white text-xs font-bold px-3.5 py-2 rounded-md hover:bg-emerald-700 transition shadow-sm"
+            >
+              💾 Guardar Cambios
+            </button>
+            <button
+              onclick="reiniciarADatosIniciales()"
+              class="bg-slate-500 text-white text-xs font-bold px-3.5 py-2 rounded-md hover:bg-slate-600 transition shadow-sm"
+            >
+              🔄 Reiniciar Demo
+            </button>
           </div>
         </div>
-      </div>
-    </section>
 
-    <!-- FORMULARIO GENERAL COMPLETO DEL POSTULANTE -->
-    <section id="simulador-postulante" class="seccion-content">
-      <div class="form-card">
-        <h2>📝 Formulario General de Ingreso - Postulantes</h2>
-        <p class="subtitle">Ingresá tus datos completos. Todos los campos son obligatorios.</p>
+        <div
+          class="bg-white border border-gastro-border rounded-xl shadow-sm overflow-x-auto"
+        >
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr
+                class="bg-gastro-subtle border-b border-gastro-border text-gastro-primary font-bold uppercase tracking-wider text-[11px]"
+              >
+                <th class="p-3">Capacitador</th>
+                <th class="p-3">Regional</th>
+                <th class="p-3">Zonal</th>
+                <th class="p-3">Local</th>
+                <th class="p-3 w-28">Puesto / Turno</th>
+                <th class="p-3">Notas Solicitud</th>
+                <th class="p-3">Fecha Jornada</th>
+                <th class="p-3 w-28">Hora</th>
+                <th class="p-3">Estado</th>
+                <th class="p-3">Fecha Ingreso</th>
+                <th class="p-3">Postulante Asignado</th>
+                <th class="p-3 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody
+              id="body-tabla-vacantes"
+              class="divide-y divide-gastro-border"
+            >
+              <!-- JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-        <form onsubmit="enviarFormularioPostulante(event)">
-          <div class="form-grid-12">
+      <!-- PENDIENTES DE ASIGNACIÓN -->
+      <section id="pendientes-asignacion" class="seccion-content hidden">
+        <div class="mb-5">
+          <h2 class="text-xl font-bold text-gastro-primary">
+            📥 Postulantes Pendientes de Asignación
+          </h2>
+          <p class="text-xs text-slate-500">
+            Postulaciones recibidas mediante el Formulario General. Asígnalas
+            manualmente a la vacante correspondiente.
+          </p>
+        </div>
+
+        <div
+          id="grid-pendientes"
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        >
+          <!-- JS -->
+        </div>
+      </section>
+
+      <!-- CONFIGURACIÓN -->
+      <section id="configuracion" class="seccion-content hidden">
+        <div class="mb-5">
+          <h2 class="text-xl font-bold text-gastro-primary">
+            ⚙️ Configuración del Sistema (Tablas Maestras)
+          </h2>
+          <p class="text-xs text-slate-500">
+            Gestiona los catálogos base del sistema.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div
+            class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm"
+          >
+            <h3 class="font-bold text-gastro-primary text-sm mb-3">
+              📍 Locales y Direcciones
+            </h3>
+            <form
+              onsubmit="guardarLocal(event)"
+              class="flex flex-col gap-2 mb-3"
+            >
+              <input
+                type="text"
+                id="loc-nombre"
+                placeholder="Nombre Local"
+                class="input-clean"
+                required
+              />
+              <input
+                type="text"
+                id="loc-direccion"
+                placeholder="Dirección exacta"
+                class="input-clean"
+                required
+              />
+              <button
+                type="submit"
+                class="bg-gastro-accent text-white text-xs font-bold py-2 rounded-md hover:bg-gastro-primary transition"
+              >
+                + Agregar Local
+              </button>
+            </form>
+            <ul
+              id="lista-locales"
+              class="divide-y divide-slate-100 max-h-44 overflow-y-auto"
+            ></ul>
+          </div>
+
+          <div
+            class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm"
+          >
+            <h3 class="font-bold text-gastro-primary text-sm mb-3">
+              👤 Capacitadores RRHH
+            </h3>
+            <form
+              onsubmit="guardarCapacitador(event)"
+              class="flex flex-col gap-2 mb-3"
+            >
+              <input
+                type="text"
+                id="cap-nombre"
+                placeholder="Nombre completo"
+                class="input-clean"
+                required
+              />
+              <button
+                type="submit"
+                class="bg-gastro-accent text-white text-xs font-bold py-2 rounded-md hover:bg-gastro-primary transition"
+              >
+                + Agregar Capacitador
+              </button>
+            </form>
+            <ul
+              id="lista-capacitadores"
+              class="divide-y divide-slate-100 max-h-44 overflow-y-auto"
+            ></ul>
+          </div>
+
+          <div
+            class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm"
+          >
+            <h3 class="font-bold text-gastro-primary text-sm mb-3">
+              ⏰ Horarios de Jornada
+            </h3>
+            <form
+              onsubmit="guardarHorario(event)"
+              class="flex flex-col gap-2 mb-3"
+            >
+              <input type="time" id="hor-valor" class="input-clean" required />
+              <button
+                type="submit"
+                class="bg-gastro-accent text-white text-xs font-bold py-2 rounded-md hover:bg-gastro-primary transition"
+              >
+                + Agregar Horario
+              </button>
+            </form>
+            <ul
+              id="lista-horarios"
+              class="divide-y divide-slate-100 max-h-44 overflow-y-auto"
+            ></ul>
+          </div>
+
+          <div
+            class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm flex flex-col gap-3"
+          >
+            <h3 class="font-bold text-gastro-primary text-sm">
+              🌍 Regionales y Zonales
+            </h3>
+            <div
+              class="bg-gastro-subtle p-3 rounded-lg border border-gastro-border"
+            >
+              <h4 class="font-semibold text-xs text-gastro-primary mb-1">
+                Regionales
+              </h4>
+              <form onsubmit="guardarRegional(event)" class="flex gap-2">
+                <input
+                  type="text"
+                  id="reg-nombre"
+                  placeholder="Ej. CABA"
+                  class="input-clean"
+                  required
+                />
+                <button
+                  type="submit"
+                  class="bg-gastro-accent text-white font-bold px-3 text-xs rounded-md"
+                >
+                  +
+                </button>
+              </form>
+              <ul
+                id="lista-regionales"
+                class="divide-y divide-slate-200 mt-2 max-h-24 overflow-y-auto"
+              ></ul>
+            </div>
+
+            <div
+              class="bg-gastro-subtle p-3 rounded-lg border border-gastro-border"
+            >
+              <h4 class="font-semibold text-xs text-gastro-primary mb-1">
+                Zonales
+              </h4>
+              <form onsubmit="guardarZonal(event)" class="flex gap-2">
+                <input
+                  type="text"
+                  id="zon-nombre"
+                  placeholder="Ej. Norte"
+                  class="input-clean"
+                  required
+                />
+                <button
+                  type="submit"
+                  class="bg-gastro-accent text-white font-bold px-3 text-xs rounded-md"
+                >
+                  +
+                </button>
+              </form>
+              <ul
+                id="lista-zonales"
+                class="divide-y divide-slate-200 mt-2 max-h-24 overflow-y-auto"
+              ></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FORMULARIO POSTULANTE -->
+      <section id="simulador-postulante" class="seccion-content hidden">
+        <div
+          class="bg-white p-8 rounded-2xl border border-gastro-border max-w-3xl mx-auto shadow-sm"
+        >
+          <h2 class="text-xl font-bold text-gastro-primary">
+            📝 Formulario General de Ingreso - Postulantes
+          </h2>
+          <p class="text-xs text-slate-500 mb-6">
+            Completa tus datos personales para el proceso de selección.
+          </p>
+
+          <form
+            onsubmit="enviarFormularioPostulante(event)"
+            class="grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
             <div>
-              <label>Nombre/s</label>
-              <input type="text" id="post-nombre" placeholder="Juan" required>
+              <label class="label-form">Nombre/s</label>
+              <input
+                type="text"
+                id="post-nombre"
+                placeholder="Juan"
+                class="input-clean"
+                required
+              />
             </div>
             <div>
-              <label>Apellido/s</label>
-              <input type="text" id="post-apellido" placeholder="Pérez" required>
+              <label class="label-form">Apellido/s</label>
+              <input
+                type="text"
+                id="post-apellido"
+                placeholder="Pérez"
+                class="input-clean"
+                required
+              />
             </div>
             <div>
-              <label>Teléfono Celular</label>
-              <input type="tel" id="post-telefono" placeholder="1112345678" required>
+              <label class="label-form">Teléfono Celular</label>
+              <input
+                type="tel"
+                id="post-telefono"
+                placeholder="1112345678"
+                class="input-clean"
+                required
+              />
             </div>
             <div>
-              <label>Teléfono de Emergencia</label>
-              <input type="tel" id="post-tel-emergencia" placeholder="1187654321" required>
+              <label class="label-form">Teléfono de Emergencia</label>
+              <input
+                type="tel"
+                id="post-tel-emergencia"
+                placeholder="1187654321"
+                class="input-clean"
+                required
+              />
             </div>
             <div>
-              <label>Fecha de Nacimiento</label>
-              <input type="date" id="post-fecha-nac" required>
+              <label class="label-form">Fecha de Nacimiento</label>
+              <input
+                type="date"
+                id="post-fecha-nac"
+                class="input-clean"
+                required
+              />
             </div>
             <div>
-              <label>Nacionalidad</label>
-              <input type="text" id="post-nacionalidad" placeholder="Argentina" required>
+              <label class="label-form">Nacionalidad</label>
+              <input
+                type="text"
+                id="post-nacionalidad"
+                placeholder="Argentina"
+                class="input-clean"
+                required
+              />
             </div>
             <div>
-              <label>CUIL</label>
-              <input type="text" id="post-cuil" placeholder="20-12345678-9" required>
+              <label class="label-form">CUIL</label>
+              <input
+                type="text"
+                id="post-cuil"
+                placeholder="20-12345678-9"
+                class="input-clean"
+                required
+              />
             </div>
             <div>
-              <label>Sexo</label>
-              <select id="post-sexo" class="cell-select" required>
+              <label class="label-form">Sexo</label>
+              <select id="post-sexo" class="input-clean" required>
                 <option value="">Seleccionar...</option>
                 <option value="Masculino">Masculino</option>
                 <option value="Femenino">Femenino</option>
                 <option value="Otro">Otro</option>
               </select>
             </div>
-            <div class="col-span-2">
-              <label>Dirección Completa del Domicilio</label>
-              <input type="text" id="post-direccion" placeholder="Av. Siempre Viva 123, Piso 2 Depto B" required>
+            <div class="md:col-span-2">
+              <label class="label-form">Dirección Completa del Domicilio</label>
+              <input
+                type="text"
+                id="post-direccion"
+                placeholder="Av. Corrientes 1234, CABA"
+                class="input-clean"
+                required
+              />
             </div>
             <div>
-              <label>Código Postal (CP)</label>
-              <input type="text" id="post-cp" placeholder="1425" required>
+              <label class="label-form">Código Postal (CP)</label>
+              <input
+                type="text"
+                id="post-cp"
+                placeholder="1425"
+                class="input-clean"
+                required
+              />
             </div>
             <div>
-              <label>Localidad</label>
-              <input type="text" id="post-localidad" placeholder="CABA" required>
+              <label class="label-form">Localidad</label>
+              <input
+                type="text"
+                id="post-localidad"
+                placeholder="CABA"
+                class="input-clean"
+                required
+              />
             </div>
-            <div class="col-span-2">
-              <label>Correo Electrónico (E-mail)</label>
-              <input type="email" id="post-email" placeholder="juan.perez@email.com" required>
+            <div class="md:col-span-2">
+              <label class="label-form">Correo Electrónico (E-mail)</label>
+              <input
+                type="email"
+                id="post-email"
+                placeholder="juan.perez@email.com"
+                class="input-clean"
+                required
+              />
             </div>
-          </div>
-          <button type="submit" class="btn btn-success btn-block mt-10">🚀 Enviar Formulario</button>
-        </form>
-      </div>
-    </section>
+            <button
+              type="submit"
+              class="md:col-span-2 mt-4 bg-emerald-600 text-white font-bold py-3 rounded-lg hover:bg-emerald-700 transition shadow"
+            >
+              🚀 Enviar Formulario
+            </button>
+          </form>
+        </div>
+      </section>
+    </main>
 
-  </main>
-
-  <script src="app.js"></script>
-</body>
+    <script src="app.js"></script>
+  </body>
 </html>
