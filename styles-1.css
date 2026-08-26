@@ -1,0 +1,443 @@
+/* ==========================================
+   1. RESET GLOBAL Y MICRO-FIXES DE INTERFAZ
+   ========================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reset de Controles de Formulario */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+/* Scrollbar Personalizada para Navegadores Webkit */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f0f4fa;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2160c4;
+}
+
+/* ==========================================
+   2. SISTEMA DE AVISOS Y NOTIFICACIONES
+   ========================================== */
+.aviso-sistema {
+  position: fixed;
+  top: 4.75rem;
+  left: 50%;
+  z-index: 80;
+  max-width: min(90vw, 22rem);
+  padding: 0.65rem 1rem;
+  border-radius: 0.75rem;
+  background: #122852;
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.3;
+  box-shadow: 0 8px 24px rgba(18, 40, 82, 0.22);
+  opacity: 0;
+  transform: translateX(-50%) translateY(-6px);
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    visibility 0.18s ease;
+}
+
+.aviso-sistema.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.aviso-sistema.error {
+  background: #9f1239;
+}
+
+/* ==========================================
+   3. ESTILOS DE CONTROLES E INPUTS
+   ========================================== */
+.label-form {
+  font-size: 0.725rem;
+  font-weight: 700;
+  color: #122852;
+  display: block;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* Inputs Standard de Formularios */
+.input-clean {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.875rem;
+  border-radius: 0.5rem;
+  border: 1px solid #d8e3f5;
+  background-color: #ffffff;
+  color: #0f172a;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.input-clean:hover {
+  border-color: #2160c4;
+}
+
+.input-clean:focus {
+  border-color: #2160c4;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(33, 96, 196, 0.14);
+}
+
+/* Validaciones Visuales */
+.input-clean.input-error {
+  border-color: #e11d48;
+  background-color: #fff8f8;
+}
+
+.input-clean.input-error:focus {
+  border-color: #e11d48;
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.14);
+}
+
+.input-clean.input-ok {
+  border-color: #059669;
+}
+
+.input-clean.input-ok:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.14);
+}
+
+.msg-campo {
+  min-height: 1.1rem;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #e11d48;
+  line-height: 1.3;
+}
+
+/* Controls en Celda de Tabla Operativa */
+.cell-select,
+.cell-input {
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  border: 1px solid #d8e3f5;
+  background-color: #ffffff;
+  color: #0f172a;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.cell-select:hover,
+.cell-input:hover {
+  border-color: #2160c4;
+}
+
+.cell-select:focus,
+.cell-input:focus {
+  border-color: #2160c4;
+  box-shadow: 0 0 0 3px rgba(33, 96, 196, 0.14);
+}
+
+/* SVG Flecha Personalizada para Todos los Selects */
+select.input-clean,
+select.cell-select {
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%232160C4'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/svg%3E");
+  background-position: right 0.6rem center;
+  background-repeat: no-repeat;
+  background-size: 0.85rem;
+}
+
+/* Iconos Personalizados para Inputs de Fecha y Hora */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 0.1rem;
+  filter: invert(30%) sepia(80%) saturate(1000%) hue-rotate(200deg);
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Badges de Estado Operativo */
+.select-estado {
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.35rem 1.75rem 0.35rem 0.65rem;
+  border-radius: 0.375rem;
+  font-weight: 700;
+  font-size: 0.75rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23122852'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M19 9l-7 7-7-7'%3E%3C/svg%3E");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 0.75rem;
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.select-estado:hover {
+  filter: brightness(0.96);
+}
+
+.select-estado.PENDIENTE {
+  background-color: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+.select-estado.PRESENTE {
+  background-color: #e0f2fe;
+  color: #075985;
+  border-color: #bae6fd;
+}
+.select-estado.HUELLA {
+  background-color: #f3e8ff;
+  color: #6b21a8;
+  border-color: #e9d5ff;
+}
+.select-estado.ENVIADO {
+  background-color: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+/* ==========================================
+   4. NAVEGACIÓN Y BOTONES DE ACCIÓN
+   ========================================== */
+.nav-btn.active-nav {
+  background-color: #f0f4fa;
+  color: #122852;
+}
+
+.nav-movil .nav-btn.active-nav {
+  color: #122852;
+  box-shadow: inset 0 3px 0 #2160c4;
+}
+
+button {
+  cursor: pointer;
+  user-select: none;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+.nav-btn:focus-visible,
+button:focus-visible,
+.input-clean:focus-visible,
+.cell-select:focus-visible,
+.cell-input:focus-visible,
+.select-estado:focus-visible {
+  outline: 2px solid #2160c4;
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 60;
+  padding: 0.5rem 0.75rem;
+  background: #ffffff;
+  color: #122852;
+  font-weight: 700;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.skip-link:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+}
+
+/* ==========================================
+   5. TABLA OPERATIVA Y RESPONSIVE CARDS
+   ========================================== */
+@media (max-width: 1023px) {
+  .tabla-wrap {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .tabla-vacantes thead {
+    display: none;
+  }
+
+  .tabla-vacantes,
+  .tabla-vacantes tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .tabla-vacantes tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0;
+  }
+
+  .tabla-vacantes tbody tr.fila-vacante {
+    display: block;
+    background: #ffffff;
+    border: 1px solid #d8e3f5;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px rgba(18, 40, 82, 0.06);
+    overflow: hidden;
+  }
+
+  .tabla-vacantes tbody tr.fila-vacante td {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 38%) 1fr;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border: 0;
+    border-bottom: 1px solid #f0f4fa;
+  }
+
+  .tabla-vacantes tbody tr.fila-vacante td:last-child {
+    border-bottom: 0;
+    grid-template-columns: 1fr;
+    background: #f8fafc;
+  }
+
+  .tabla-vacantes tbody tr.fila-vacante td::before {
+    content: attr(data-label);
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #122852;
+  }
+
+  .tabla-vacantes tbody tr.fila-vacante.has-postulant-open {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: 1px dashed #d8e3f5;
+  }
+  
+  .tabla-vacantes tbody tr.row-postulante {
+    display: block;
+    background: #ffffff;
+    border: 1px solid #d8e3f5;
+    border-top: none;
+    border-bottom-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+    margin-top: -0.75rem;
+    box-shadow: 0 2px 4px rgba(18, 40, 82, 0.06);
+  }
+
+  .tabla-vacantes tbody tr.row-postulante td {
+    display: block;
+    width: 100%;
+    padding: 0.75rem;
+  }
+
+  .tabla-vacantes tbody tr.row-postulante td::before {
+    content: none;
+  }
+
+  .acciones-vacante {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .acciones-vacante button {
+    min-height: 2.5rem;
+    flex: 1 1 calc(50% - 0.25rem);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .tabla-vacantes tbody tr.fila-vacia td {
+    display: block;
+    text-align: center;
+    border: none;
+    background: #ffffff;
+  }
+
+  .tabla-vacantes tbody tr.fila-vacia td::before {
+    content: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .tabla-vacantes tbody tr.fila-vacante td {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+}
+
+@media (min-width: 1024px) {
+  .input-clean {
+    min-height: 2.5rem;
+    font-size: 0.8125rem;
+  }
+}
+
+.nav-movil {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+}
