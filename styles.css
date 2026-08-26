@@ -268,6 +268,32 @@ button:focus-visible,
   .tabla-vacantes tbody tr.fila-vacia td::before {
     content: none;
   }
+
+  /* Clases exclusivas para Row 1/2 en Móvil (Mantener estética de Tarjeta única) */
+  .tabla-vacantes tbody tr.fila-vacante.has-postulant-open {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: 1px dashed #d8e3f5;
+  }
+  
+  .tabla-vacantes tbody tr.row-postulante {
+    border-top: none;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    margin-top: -0.75rem; /* Une visualmente la tarjeta de info expandida con la vacante */
+  }
+
+  .tabla-vacantes tbody tr.row-postulante td {
+    grid-template-columns: 1fr;
+  }
+
+  .tabla-vacantes tbody tr.row-postulante td::before {
+    content: none; /* Quitamos la etiqueta para la vista detallada */
+  }
+
+  .acciones-td {
+    border-bottom: 0 !important;
+  }
 }
 
 @media (max-width: 420px) {
