@@ -1,5 +1,194 @@
-let db = null;
+// ==========================================
+// CONFIGURACIÓN GLOBAL DE API Y ESTADO
+// ==========================================
+const API_URL = "https://script.google.com/macros/s/AKfycbzxkkH1lLUedBv-L7rTNTmlvLhd2sQXnj2JkMhaDHldDPdqqYIvMCffYzVOSPJec9tr/exec";
+
+let datosGlobales = {
+  vacantesSabores: [],
+  vacantesExtremas: [],
+  pendientes: []
+};
+
+let estadoUI = {
+  marcaActiva: "SABORES", // "SABORES" o "EXTREMAS"
+  paginaActual: 1,
+  registrosPorPagina: 20
+};
+
 let avisoTimer = null;
+let sincronizando = false;
+let autoSyncTimer = null;
+const SYNC_INTERVAL_MS = 60000;
+
+const ICONOS = {
+  editar: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20h4l10.5-10.5a1.5 1.5 0 0 0-4.24-4.24L4 15.76V20z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/><path d="M13.5 6.5l4 4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`,
+  editarCandidato: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 21a8 8 0 1 0-16 0" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.75"/></svg>`,
+  candidato: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="1.75"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.75"/></svg>`,
+  asignar: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`,
+  liberar: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 14L4 9l5-5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20v-7a4 4 0 0 0-4-4H4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  reasignar: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 7H20M7 7L11 3M7 7L11 11" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 17H4M17 17L13 21M17 17L13 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+};
+
+function escapeHtml(texto) {
+  return String(texto ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function crearBotonIcono({ onclick, titulo, icono, clase = "" }) {
+  return `<button type="button" class="btn-icono ${clase}" onclick="${onclick}" aria-label="${escapeHtml(titulo)}" title="${escapeHtml(titulo)}">${ICONOS[icono]}</button>`;
+}
+
+function fechaParaInput(valor) {
+  const partes = extraerFechaHora(valor);
+  if (!partes || !partes.y) return "";
+  const dd = String(partes.d).padStart(2, "0");
+  const mm = String(partes.m).padStart(2, "0");
+  return `${partes.y}-${mm}-${dd}`;
+}
+
+function horaParaInput(valor) {
+  const partes = extraerFechaHora(valor);
+  if (!partes) return "";
+  const hh = String(partes.h).padStart(2, "0");
+  const min = String(partes.min).padStart(2, "0");
+  return `${hh}:${min}`;
+}
+
+function obtenerVacantePorRowId(rowId) {
+  const lista = estadoUI.marcaActiva === "SABORES"
+    ? datosGlobales.vacantesSabores
+    : datosGlobales.vacantesExtremas;
+  return lista.find((item) => item.rowId === rowId);
+}
+
+function obtenerPestanaActiva() {
+  return estadoUI.marcaActiva === "SABORES" ? "VACANTES SABORES" : "VACANTES EXTREMAS";
+}
+
+function etiquetaVacante(v) {
+  const puesto = v.part || v.full || "Sin puesto";
+  const turno = v.notas || "Sin turno";
+  const local = v.local || "Sin local";
+  return `Fila #${v.rowId} · ${local} · ${puesto} · ${turno}`;
+}
+
+function normalizarCuil(cuil) {
+  if (!cuil) return "";
+  return String(cuil).replace(/\D/g, "");
+}
+
+function esVacanteCompleta(postulante) {
+  return !!postulante && !!normalizarCuil(postulante.cuil);
+}
+
+function obtenerTodasLasVacantes() {
+  return [
+    ...datosGlobales.vacantesSabores.map((v) => ({ ...v, marca: "SABORES", pestana: "VACANTES SABORES" })),
+    ...datosGlobales.vacantesExtremas.map((v) => ({ ...v, marca: "EXTREMAS", pestana: "VACANTES EXTREMAS" }))
+  ];
+}
+
+function buscarVacantePorCuilLocal(cuil, excluir) {
+  const norm = normalizarCuil(cuil);
+  if (!norm) return null;
+
+  for (const v of obtenerTodasLasVacantes()) {
+    if (!v.postulante) continue;
+    if (excluir && v.pestana === excluir.pestana && v.rowId === excluir.rowId) continue;
+    if (normalizarCuil(v.postulante.cuil) === norm) return v;
+  }
+  return null;
+}
+
+function obtenerVacantesLibresMarcaActiva(excluirRowId) {
+  const lista = estadoUI.marcaActiva === "SABORES"
+    ? datosGlobales.vacantesSabores
+    : datosGlobales.vacantesExtremas;
+  return lista.filter((v) => !v.postulante && v.rowId !== excluirRowId);
+}
+
+function extraerFechaHora(valor) {
+  if (valor === null || valor === undefined || valor === "") return null;
+  if (valor instanceof Date && !Number.isNaN(valor.getTime())) {
+    return {
+      d: valor.getDate(),
+      m: valor.getMonth() + 1,
+      y: valor.getFullYear(),
+      h: valor.getHours(),
+      min: valor.getMinutes()
+    };
+  }
+
+  const s = String(valor).trim();
+  const dmy = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/);
+  if (dmy) {
+    const y = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
+    return { d: Number(dmy[1]), m: Number(dmy[2]), y, h: 0, min: 0 };
+  }
+
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  if (iso) {
+    return {
+      y: Number(iso[1]),
+      m: Number(iso[2]),
+      d: Number(iso[3]),
+      h: Number(iso[4] || 0),
+      min: Number(iso[5] || 0)
+    };
+  }
+
+  const hora = s.match(/^(\d{1,2}):(\d{2})/);
+  if (hora) {
+    return { d: 0, m: 0, y: 0, h: Number(hora[1]), min: Number(hora[2]) };
+  }
+
+  const parsed = new Date(s);
+  if (!Number.isNaN(parsed.getTime())) {
+    return {
+      d: parsed.getDate(),
+      m: parsed.getMonth() + 1,
+      y: parsed.getFullYear(),
+      h: parsed.getHours(),
+      min: parsed.getMinutes()
+    };
+  }
+
+  return null;
+}
+
+function formatearFechaJornada(valor) {
+  const partes = extraerFechaHora(valor);
+  if (!partes || !partes.y) return "--/--/----";
+  const dd = String(partes.d).padStart(2, "0");
+  const mm = String(partes.m).padStart(2, "0");
+  return `${dd}/${mm}/${partes.y}`;
+}
+
+function formatearHoraJornada(valor) {
+  const partes = extraerFechaHora(valor);
+  if (!partes) return "--:-- hs";
+  const hh = String(partes.h).padStart(2, "0");
+  const min = String(partes.min).padStart(2, "0");
+  return `${hh}:${min} hs`;
+}
+
+function esCheckboxMarcado(valor) {
+  if (valor === true) return true;
+  if (valor === false || valor === null || valor === undefined || valor === "") return false;
+  const s = String(valor).trim().toUpperCase();
+  return s === "TRUE" || s === "VERDADERO" || s === "SI" || s === "SÍ" || s === "X" || s === "✓" || s === "HUELLA" || s === "ENVIADO";
+}
+
+function resolverEstado(huella, enviado) {
+  const tieneHuella = esCheckboxMarcado(huella);
+  const tieneEnviado = esCheckboxMarcado(enviado);
+  if (tieneEnviado) return "ENVIADO";
+  if (tieneHuella) return "HUELLA";
+  return "PENDIENTE";
+}
 
 function mostrarAviso(texto, tipo = "ok") {
   const el = document.getElementById("aviso-sistema");
@@ -10,980 +199,689 @@ function mostrarAviso(texto, tipo = "ok") {
   clearTimeout(avisoTimer);
   avisoTimer = setTimeout(() => {
     el.classList.remove("visible");
-  }, 1000);
+  }, 1200);
 }
 
-async function initDatabase() {
+// ==========================================
+// CARGA INICIAL DE DATOS (READ FROM SHEETS)
+// ==========================================
+function setEstadoBotonSync(activo) {
+  const btn = document.getElementById("btn-sync-flotante");
+  if (btn) btn.classList.toggle("sincronizando", activo);
+}
+
+async function cargarDatosDesdeBackend(opciones = {}) {
+  const { silencioso = false, manual = false } = opciones;
+
+  if (sincronizando) return;
+  sincronizando = true;
+  setEstadoBotonSync(true);
+
+  if (!silencioso && manual) mostrarAviso("Cargando datos...", "ok");
+
   try {
-    const config = {
-      locateFile: (file) =>
-        `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`,
-    };
+    const response = await fetch(`${API_URL}?action=obtenerTodo`);
+    const json = await response.json();
 
-    const SQL = await initSqlJs(config);
-    const savedDb = localStorage.getItem("sqlite_rrhh_db");
+    if (json.status === "success") {
+      datosGlobales.vacantesSabores = json.data.vacantesSabores || [];
+      datosGlobales.vacantesExtremas = json.data.vacantesExtremas || [];
+      datosGlobales.pendientes = json.data.pendientes || [];
 
-    if (savedDb) {
-      const uInt8Array = new Uint8Array(JSON.parse(savedDb));
-      db = new SQL.Database(uInt8Array);
-    } else {
-      db = new SQL.Database();
-      crearTablasYPrecargar();
-      guardarCambiosBD();
+      renderizarSeccionActual();
+
+      if (manual) mostrarAviso("Datos sincronizados", "ok");
+    } else if (!silencioso) {
+      mostrarAviso("Error de respuesta del servidor", "error");
     }
-
-    renderizarTodo();
-  } catch (err) {
-    console.error("Error al inicializar SQLite:", err);
-    mostrarAviso("No se pudo cargar la base", "error");
+  } catch (error) {
+    console.error("Error al cargar datos:", error);
+    if (!silencioso) mostrarAviso("Error de conexión con la base", "error");
+  } finally {
+    sincronizando = false;
+    setEstadoBotonSync(false);
   }
 }
 
-function crearTablasYPrecargar() {
-  const ddl = `
-    CREATE TABLE IF NOT EXISTS regionales (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS zonales (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS capacitadores (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS locales (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL, direccion TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS horarios_jornada (id INTEGER PRIMARY KEY AUTOINCREMENT, hora TEXT NOT NULL);
+function iniciarAutoSync() {
+  if (autoSyncTimer) clearInterval(autoSyncTimer);
+  autoSyncTimer = setInterval(() => {
+    cargarDatosDesdeBackend({ silencioso: true });
+  }, SYNC_INTERVAL_MS);
 
-    CREATE TABLE IF NOT EXISTS postulantes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre TEXT, apellido TEXT, telefono TEXT, tel_emergencia TEXT,
-      fecha_nacimiento TEXT, nacionalidad TEXT, cuil TEXT, sexo TEXT,
-      direccion TEXT, cp TEXT, localidad TEXT, email TEXT,
-      altas_rrhh TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS vacantes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      capacitador_id INTEGER,
-      regional_id INTEGER,
-      zonal_id INTEGER,
-      local_id INTEGER,
-      tipo_puesto TEXT,
-      turno TEXT,
-      notas_solicitud TEXT,
-      fecha TEXT,
-      hora TEXT,
-      estado TEXT DEFAULT 'PENDIENTE',
-      fecha_ingreso TEXT,
-      postulante_id INTEGER
-    );
-
-    INSERT INTO regionales (nombre) VALUES ('Reg. CABA'), ('Reg. GBA');
-    INSERT INTO zonales (nombre) VALUES ('Zona Norte'), ('Zona Sur');
-    INSERT INTO capacitadores (nombre) VALUES ('María González'), ('Carlos Rodríguez');
-    INSERT INTO locales (nombre, direccion) VALUES ('Centro 01', 'Av. Corrientes 1234'), ('Shopping Sur', 'Av. Pavón 5600');
-    INSERT INTO horarios_jornada (hora) VALUES ('14:00'), ('15:30'), ('18:00');
-
-    INSERT INTO vacantes (capacitador_id, regional_id, zonal_id, local_id, tipo_puesto, turno, notas_solicitud, fecha, hora, estado) 
-    VALUES (1, 1, 1, 1, 'PART', 'NOCHE', 'Juan Pérez - 1144556677', '2026-08-25', '14:00', 'PENDIENTE');
-  `;
-  db.run(ddl);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      cargarDatosDesdeBackend({ silencioso: true });
+    }
+  });
 }
 
-function guardarCambiosBD() {
-  if (!db) return;
-  const data = db.export();
-  localStorage.setItem("sqlite_rrhh_db", JSON.stringify(Array.from(data)));
+async function enviarPostApi(payload) {
+  const response = await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload),
+    redirect: "follow"
+  });
+
+  const texto = await response.text();
+  try {
+    return JSON.parse(texto);
+  } catch {
+    throw new Error("El servidor no devolvió una respuesta válida. ¿Reimplementaste el Web App?");
+  }
 }
 
-function reiniciarADatosIniciales() {
-  localStorage.removeItem("sqlite_rrhh_db");
-  mostrarAviso("Demo reiniciada");
-  setTimeout(() => location.reload(), 1000);
-}
-
-function renderizarTodo() {
-  if (!db) return;
-  renderizarTablaVacantes();
+function renderizarSeccionActual() {
+  renderizarVistaOperativa();
   renderizarPendientes();
-  renderizarABMs();
 }
 
-function getOp(tabla, colName = "nombre") {
-  if (!db) return [];
-  const res = db.exec(`SELECT id, ${colName} FROM ${tabla}`);
-  if (!res.length) return [];
-  return res[0].values.map(([id, val]) => ({ id, val }));
+// ==========================================
+// VISTA OPERATIVA (SABORES / EXTREMAS + PAGINACIÓN)
+// ==========================================
+function actualizarTabsMarca(seccionActiva) {
+  const enVacantes = seccionActiva === "vista-operativa";
+  const tabSabores = document.getElementById("tab-sabores");
+  const tabExtremas = document.getElementById("tab-extremas");
+
+  if (tabSabores) tabSabores.classList.toggle("active-tab", enVacantes && estadoUI.marcaActiva === "SABORES");
+  if (tabExtremas) tabExtremas.classList.toggle("active-tab", enVacantes && estadoUI.marcaActiva === "EXTREMAS");
 }
 
-// TABLA OPERATIVA PRINCIPAL
-function renderizarTablaVacantes() {
-  const tbody = document.getElementById("body-tabla-vacantes");
-  if (!tbody) return;
-  tbody.innerHTML = "";
+function cambiarMarcaVacante(marca) {
+  estadoUI.marcaActiva = marca;
+  estadoUI.paginaActual = 1;
+  mostrarSeccion("vista-operativa");
+  renderizarVistaOperativa();
+  renderizarPendientes();
+}
 
-  const listCap = getOp("capacitadores");
-  const listReg = getOp("regionales");
-  const listZon = getOp("zonales");
-  const listLoc = getOp("locales");
-  const listHor = getOp("horarios_jornada", "hora");
+function renderizarVistaOperativa() {
+  const container = document.getElementById("contenedor-tarjetas-vacantes");
+  if (!container) return;
+  container.innerHTML = "";
 
-  const sql = `
-    SELECT v.id, v.capacitador_id, v.regional_id, v.zonal_id, v.local_id,
-           v.tipo_puesto, v.turno, v.notas_solicitud, v.fecha, v.hora, v.estado, v.fecha_ingreso,
-           p.id as post_id, p.nombre, p.apellido, p.telefono, p.cuil, p.altas_rrhh
-    FROM vacantes v
-    LEFT JOIN postulantes p ON v.postulante_id = p.id
-  `;
+  const listaCompleta = estadoUI.marcaActiva === "SABORES" 
+    ? datosGlobales.vacantesSabores 
+    : datosGlobales.vacantesExtremas;
 
-  const res = db.exec(sql);
-  if (!res.length) {
-    tbody.innerHTML = `<tr class="fila-vacia"><td colspan="12" class="p-8 text-center text-slate-400 italic">No hay vacantes. Agregá una para comenzar la jornada.</td></tr>`;
+  if (!listaCompleta.length) {
+    container.innerHTML = `
+      <div class="bg-white border border-gastro-border rounded-xl p-8 text-center text-slate-400 italic">
+        No hay registros cargados en la hoja "VACANTES ${estadoUI.marcaActiva}".
+      </div>`;
+    actualizarBarraPaginacion(0);
     return;
   }
 
-  res[0].values.forEach((row) => {
-    const [
-      id,
-      capId,
-      regId,
-      zonId,
-      locId,
-      tipo,
-      turno,
-      notas,
-      fecha,
-      hora,
-      estado,
-      fechaIngreso,
-      pId,
-      pNom,
-      pApe,
-      pTel,
-      pCuil,
-      pAltas,
-    ] = row;
+  // Paginación en memoria
+  const inicio = (estadoUI.paginaActual - 1) * estadoUI.registrosPorPagina;
+  const fin = inicio + estadoUI.registrosPorPagina;
+  const listaPagina = listaCompleta.slice(inicio, fin);
 
-    const tr = document.createElement("tr");
-    tr.dataset.vacanteId = id;
-    tr.className = "hover:bg-gastro-subtle transition-colors";
+  listaPagina.forEach((v) => {
+    const p = v.postulante;
+    const tienePostulante = p !== null && p !== undefined;
+    const vacanteCompleta = esVacanteCompleta(p);
+    const estado = resolverEstado(v.huella, v.enviado);
 
-    const tieneHuella = estado === "HUELLA" || estado === "ENVIADO";
-
-    tr.innerHTML = `
-      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Capacitador">${buildSelect("cap", listCap, capId)}</td>
-      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Regional">${buildSelect("reg", listReg, regId)}</td>
-      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Zonal">${buildSelect("zon", listZon, zonId)}</td>
-      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Local">${buildSelect("loc", listLoc, locId)}</td>
-      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Puesto / Turno">
-        <div class="grid grid-cols-2 gap-1 lg:block">
-          <select class="cell-select field-tipo font-bold">
-            <option value="PART" ${tipo === "PART" ? "selected" : ""}>PART</option>
-            <option value="FULL" ${tipo === "FULL" ? "selected" : ""}>FULL</option>
-            <option value="GT" ${tipo === "GT" ? "selected" : ""}>GT</option>
-            <option value="ET" ${tipo === "ET" ? "selected" : ""}>ET</option>
-          </select>
-          <select class="cell-select field-turno lg:mt-1">
-            <option value="ROTA" ${!turno || turno === "ROTA" ? "selected" : ""}>ROTA</option>
-            <option value="MAÑANA" ${turno === "MAÑANA" ? "selected" : ""}>MAÑANA</option>
-            <option value="MEDIO" ${turno === "MEDIO" ? "selected" : ""}>MEDIO</option>
-            <option value="TARDE" ${turno === "TARDE" ? "selected" : ""}>TARDE</option>
-            <option value="NOCHE" ${turno === "NOCHE" ? "selected" : ""}>NOCHE</option>
-          </select>
+    const card = document.createElement("div");
+    card.className = vacanteCompleta
+      ? "vacante-card-completa border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200"
+      : "bg-white border border-gastro-border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200";
+    
+    card.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-3 items-center" data-row-id="${v.rowId}">
+        
+        <!-- Local / Ubicación -->
+        <div class="lg:col-span-3 flex flex-col">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📍 Local / Ubicación</span>
+          <div class="font-extrabold text-gastro-primary text-xs mt-0.5 truncate" title="${v.local || 'Sin Local'}">
+            ${v.local || "Sin Local"} <span class="text-[10px] text-slate-400 font-normal">(${v.zonal || "S/Z"})</span>
+          </div>
+          <div class="text-[10px] text-slate-500">Capacitador: ${v.capacitador || "-"}</div>
         </div>
-      </td>
-      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Notas"><input type="text" class="cell-input field-notas" value="${notas || ""}"></td>
-      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Fecha jornada"><input type="date" class="cell-input field-fecha" value="${fecha || ""}"></td>
-      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Hora">${buildSelect("hora", listHor, hora, true)}</td>
-      <td class="p-2 lg:border-r lg:border-gastro-border lg:text-center" data-label="Estado">
-        <select class="select-estado ${estado} field-estado" onchange="validarEstadoDirecto(this)">
-          <option value="PENDIENTE" ${estado === "PENDIENTE" ? "selected" : ""}>PENDIENTE</option>
-          <option value="PRESENTE" ${estado === "PRESENTE" ? "selected" : ""}>PRESENTE</option>
-          <option value="HUELLA" ${estado === "HUELLA" ? "selected" : ""}>HUELLA</option>
-          <option value="ENVIADO" ${estado === "ENVIADO" ? "selected" : ""}>ENVIADO</option>
-        </select>
-      </td>
-      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Fecha ingreso">
-        <input type="date" class="cell-input field-fecha-ingreso" value="${fechaIngreso || ""}">
-      </td>
-      <td class="p-2 lg:border-r lg:border-gastro-border" data-label="Postulante">
-        ${pNom ? `<div class="font-bold text-gastro-primary">${pNom} ${pApe}</div><div class="text-[10px] text-slate-500">Tel: ${pTel} | CUIL: ${pCuil}</div><div class="text-[9px] text-emerald-600 font-bold">Alta: ${pAltas}</div>` : '<span class="text-slate-400 italic">Sin postulante</span>'}
-      </td>
-      <td class="p-2" data-label="Acciones">
-        <div class="acciones-vacante flex flex-wrap gap-1 justify-center">
-          <button type="button" class="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-blue-700" onclick="copiarMensajeCitacion(${id})">📋 Citación</button>
-          ${tieneHuella && pNom ? `<button type="button" class="bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-emerald-700" onclick="copiarAvisoGerente(${id})">📲 Gerente</button>` : ""}
-          ${pNom ? `<button type="button" class="bg-amber-600 text-white text-[10px] font-bold px-1.5 py-1 rounded hover:bg-amber-700" onclick="reasignarPostulante(${id}, ${pId})">🔄 Reasignar</button>` : ""}
-          <button type="button" class="bg-slate-200 text-slate-700 text-[10px] font-bold px-1.5 py-1 rounded hover:bg-rose-100 hover:text-rose-600" onclick="eliminarVacante(${id})">🗑️ Eliminar</button>
-          ${pNom ? `<button type="button" class="bg-slate-200 text-slate-700 text-[10px] font-bold px-1.5 py-1 rounded hover:bg-slate-300" onclick="liberarVacante(${id})">Liberar</button>` : ""}
+
+        <!-- Puesto y Turno -->
+        <div class="lg:col-span-2 flex flex-col">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">💼 Puesto & Turno</span>
+          <div class="flex gap-1 mt-1">
+            <span class="bg-gastro-subtle text-gastro-accent text-[10px] font-extrabold px-2 py-0.5 rounded border border-gastro-border">${v.part || v.full || "PART"}</span>
+            <span class="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded">${v.notas || "ROTA"}</span>
+          </div>
         </div>
-      </td>
+
+        <!-- Fecha y Hora -->
+        <div class="lg:col-span-2 flex flex-col">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📅 Jornada / Hora</span>
+          <div class="jornada-valor">
+            <span>${formatearFechaJornada(v.fecha)}</span>
+            <span>${formatearHoraJornada(v.hora)}</span>
+          </div>
+        </div>
+
+        <!-- Estado -->
+        <div class="lg:col-span-2 flex flex-col">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">⚡ Estado</span>
+          <span class="select-estado ${estado} text-center inline-block mt-0.5 py-1">
+            ${estado}
+          </span>
+        </div>
+
+        <!-- Acciones -->
+        <div class="lg:col-span-3 flex items-center justify-end gap-1 pt-2 lg:pt-0">
+          ${crearBotonIcono({ onclick: `abrirEditorOperativa(${v.rowId})`, titulo: "Editar vacante", icono: "editar" })}
+          ${crearBotonIcono({ onclick: `abrirEditorPostulante(${v.rowId})`, titulo: "Editar candidato", icono: "editarCandidato" })}
+          ${tienePostulante ? crearBotonIcono({ onclick: `togglePostulantePanel(${v.rowId})`, titulo: "Ver candidato", icono: "candidato" }) : ""}
+          ${tienePostulante ? crearBotonIcono({ onclick: `abrirModalReasignar(${v.rowId})`, titulo: "Reasignar candidato", icono: "reasignar" }) : ""}
+          ${tienePostulante ? crearBotonIcono({ onclick: `liberarVacante(${v.rowId})`, titulo: "Liberar vacante", icono: "liberar" }) : ""}
+        </div>
+      </div>
+
+      <!-- Ficha del Postulante Desplegable -->
+      ${tienePostulante ? `
+        <div id="panel-postulante-${v.rowId}" class="hidden mt-3 pt-3 border-t border-dashed ${vacanteCompleta ? "border-rose-200 vacante-panel-completa" : "border-gastro-border bg-gastro-subtle/40"} -mx-4 -mb-4 p-4 rounded-b-xl">
+          <div class="flex justify-between items-center mb-2">
+            <h4 class="text-xs font-extrabold text-gastro-primary uppercase tracking-wider">👤 Candidato Asignado (Fila ${v.rowId})</h4>
+            <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Alta: ${p.altasRrhh || "-"}</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs text-slate-700">
+            <div><b>Nombre:</b> ${p.nombre || ""} ${p.apellido || ""}</div>
+            <div><b>CUIL:</b> ${p.cuil || "-"}</div>
+            <div><b>Teléfono:</b> ${p.tel || "-"}</div>
+            <div><b>Email:</b> ${p.email || "-"}</div>
+            <div class="sm:col-span-2"><b>Dirección:</b> ${p.direccion || "-"}, ${p.localidad || ""}</div>
+            <div><b>Emergencia:</b> ${p.telEmergencia || "-"}</div>
+            <div><b>Fecha Nac.:</b> ${p.fechaNacimiento || "-"}</div>
+          </div>
+        </div>
+      ` : ''}
     `;
-    tbody.appendChild(tr);
+
+    container.appendChild(card);
   });
+
+  actualizarBarraPaginacion(listaCompleta.length);
 }
 
-function buildSelect(cls, list, selectedVal, isValueVal = false) {
-  let options = '<option value="">Sel...</option>';
-  list.forEach((item) => {
-    const valCompare = isValueVal ? item.val : item.id;
-    const isSel = valCompare == selectedVal ? "selected" : "";
-    options += `<option value="${valCompare}" ${isSel}>${item.val}</option>`;
-  });
-  return `<select class="cell-select field-${cls}">${options}</select>`;
+function togglePostulantePanel(rowId) {
+  const panel = document.getElementById(`panel-postulante-${rowId}`);
+  if (panel) panel.classList.toggle("hidden");
 }
 
-function validarEstadoDirecto(selectEl) {
-  selectEl.className = `select-estado ${selectEl.value} field-estado`;
+function actualizarBarraPaginacion(totalRegistros) {
+  const totalPaginas = Math.ceil(totalRegistros / estadoUI.registrosPorPagina) || 1;
+  const inicio = totalRegistros === 0 ? 0 : (estadoUI.paginaActual - 1) * estadoUI.registrosPorPagina + 1;
+  const fin = Math.min(estadoUI.paginaActual * estadoUI.registrosPorPagina, totalRegistros);
+
+  const infoPaginacion = document.getElementById("info-paginacion");
+  if (infoPaginacion) {
+    infoPaginacion.textContent = `Mostrando ${inicio}-${fin} de ${totalRegistros} registros`;
+  }
+
+  const btnAnt = document.getElementById("btn-pag-anterior");
+  const btnSig = document.getElementById("btn-pag-siguiente");
+
+  if (btnAnt) {
+    btnAnt.disabled = estadoUI.paginaActual === 1;
+    btnAnt.onclick = () => {
+      if (estadoUI.paginaActual > 1) {
+        estadoUI.paginaActual--;
+        renderizarVistaOperativa();
+      }
+    };
+  }
+
+  if (btnSig) {
+    btnSig.disabled = estadoUI.paginaActual >= totalPaginas;
+    btnSig.onclick = () => {
+      if (estadoUI.paginaActual < totalPaginas) {
+        estadoUI.paginaActual++;
+        renderizarVistaOperativa();
+      }
+    };
+  }
 }
 
-// PENDIENTES DE ASIGNACIÓN
+function cambiarTamanoPagina(valor) {
+  estadoUI.registrosPorPagina = parseInt(valor, 10);
+  estadoUI.paginaActual = 1;
+  renderizarVistaOperativa();
+}
+
+// ==========================================
+// PENDIENTES DE ASIGNACIÓN (BD INGRESO)
+// ==========================================
 function renderizarPendientes() {
   const container = document.getElementById("grid-pendientes");
   if (!container) return;
   container.innerHTML = "";
 
-  const sql = `
-    SELECT p.id, p.nombre, p.apellido, p.telefono, p.tel_emergencia, p.fecha_nacimiento, 
-           p.nacionalidad, p.cuil, p.sexo, p.direccion, p.cp, p.localidad, p.email, p.altas_rrhh
-    FROM postulantes p
-    WHERE p.id NOT IN (SELECT postulante_id FROM vacantes WHERE postulante_id IS NOT NULL)
-    ORDER BY p.id DESC
-  `;
-
-  const res = db.exec(sql);
-  const total = res.length ? res[0].values.length : 0;
+  const lista = datosGlobales.pendientes;
   document.querySelectorAll(".badge-pendientes").forEach((el) => {
-    el.innerText = total;
+    el.innerText = lista.length;
   });
 
-  if (!total) {
-    container.innerHTML = `<div class="col-span-full text-center text-slate-400 py-10 italic">🎉 ¡No hay postulantes pendientes! Todos están asignados.</div>`;
+  if (!lista.length) {
+    container.innerHTML = `<div class="col-span-full text-center text-slate-400 py-10 italic">No hay postulantes en Ingresos.</div>`;
     return;
   }
 
-  const resVac = db.exec(`
-    SELECT v.id, l.nombre, v.tipo_puesto, v.turno 
-    FROM vacantes v 
-    LEFT JOIN locales l ON v.local_id = l.id 
-    WHERE v.postulante_id IS NULL
-  `);
+  // Vacantes libres en la marca activa
+  const vacantesLibres = obtenerVacantesLibresMarcaActiva();
 
-  let optionsVacantes =
-    '<option value="">Seleccionar Vacante Libre...</option>';
-  if (resVac.length) {
-    resVac[0].values.forEach(([vId, lNom, pTipo, pTurno]) => {
-      optionsVacantes += `<option value="${vId}">Vacante #${vId} - ${lNom || "Sin Local"} (${pTipo}/${pTurno})</option>`;
-    });
-  }
+  let optionsVacantes = `<option value="">Elegir vacante para asignar...</option>`;
+  vacantesLibres.forEach(v => {
+    optionsVacantes += `<option value="${v.rowId}">${escapeHtml(etiquetaVacante(v))}</option>`;
+  });
 
-  res[0].values.forEach((row) => {
-    const [
-      pId,
-      nom,
-      ape,
-      tel,
-      telEmerg,
-      fNac,
-      nac,
-      cuil,
-      sexo,
-      dir,
-      cp,
-      loc,
-      email,
-      altas,
-    ] = row;
+  lista.forEach(p => {
+    const asignacion = buscarVacantePorCuilLocal(p.cuil);
+    const yaAsignado = !!asignacion;
+    const sinCuil = !normalizarCuil(p.cuil);
+    const bloqueado = yaAsignado || sinCuil;
 
     const card = document.createElement("div");
-    card.className =
-      "bg-white p-4 sm:p-5 rounded-xl border border-gastro-border shadow-sm flex flex-col justify-between min-w-0";
+    card.className = "bg-white p-4 sm:p-5 rounded-xl border border-gastro-border shadow-sm flex flex-col justify-between min-w-0";
     card.innerHTML = `
       <div>
-        <h3 class="font-bold text-gastro-primary text-base border-b border-slate-100 pb-2 mb-2">${nom} ${ape}</h3>
+        <div class="border-b border-slate-100 pb-2 mb-2">
+          <div class="flex flex-wrap items-center gap-2 mb-1">
+            ${yaAsignado ? `<span class="badge-asignado">Asignado · Fila #${asignacion.rowId} (${asignacion.marca})</span>` : ""}
+            ${sinCuil ? `<span class="badge-sin-cuil">Sin CUIL</span>` : ""}
+          </div>
+          <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Apellido</div>
+          <h3 class="font-bold text-gastro-primary text-base">${escapeHtml(p.apellido) || "Sin apellido"}</h3>
+          <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-2">Nombre</div>
+          <div class="text-sm font-semibold text-slate-700">${escapeHtml(p.nombre) || "Sin nombre"}</div>
+          <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-2">CUIL</div>
+          <div class="text-xs font-semibold text-slate-600">${escapeHtml(p.cuil) || "-"}</div>
+        </div>
         <div class="text-xs text-slate-600 space-y-1 mb-4 break-words">
-          <div><b>📞 Tel:</b> ${tel} | <b>Emergencia:</b> ${telEmerg || "-"}</div>
-          <div><b>🆔 CUIL:</b> ${cuil} | <b>Sexo:</b> ${sexo || "-"}</div>
-          <div><b>🎂 Nacimiento:</b> ${fNac || "-"} | <b>Nacionalidad:</b> ${nac || "-"}</div>
-          <div><b>🏠 Domicilio:</b> ${dir || "-"}, ${loc || ""} (CP ${cp || ""})</div>
-          <div><b>✉️ Email:</b> ${email || "-"}</div>
-          <div class="text-emerald-600 font-bold pt-1">⏱️ Alta RRHH: ${altas}</div>
+          <div><b>📞 Tel:</b> ${escapeHtml(p.tel) || "-"} | <b>Emergencia:</b> ${escapeHtml(p.telEmergencia) || "-"}</div>
+          <div><b>🎂 Fecha nac.:</b> ${formatearFechaJornada(p.fechaNacimiento)} | <b>Nacionalidad:</b> ${escapeHtml(p.nac) || "-"}</div>
+          <div><b>⚧ Sexo:</b> ${escapeHtml(p.sexo) || "-"} | <b>CP:</b> ${escapeHtml(p.cp) || "-"}</div>
+          <div><b>🏠 Domicilio:</b> ${escapeHtml(p.direccion) || "-"}, ${escapeHtml(p.localidad) || ""}</div>
+          <div><b>✉️ Email:</b> ${escapeHtml(p.email) || "-"}</div>
+          <div><b>📋 Altas RRHH:</b> ${formatearFechaJornada(p.altasRrhh) !== "--/--/----" ? formatearFechaJornada(p.altasRrhh) : (escapeHtml(p.altasRrhh) || "-")}</div>
         </div>
       </div>
-      <div class="bg-gastro-subtle p-3 rounded-lg border border-gastro-border flex flex-col gap-2">
-        <select id="select-vacante-pend-${pId}" class="cell-select">
-          ${optionsVacantes}
+      <div class="bg-gastro-subtle p-3 rounded-lg border border-gastro-border">
+        <select id="select-vacante-pend-${p.id}" class="cell-select${bloqueado ? " cell-select-disabled" : ""}" onchange="asignarAlElegirVacante('${p.id}')" ${bloqueado ? "disabled" : ""}>
+          ${bloqueado
+            ? `<option value="">${yaAsignado ? "Ya asignado a una vacante" : "Completar CUIL para asignar"}</option>`
+            : optionsVacantes}
         </select>
-        <button type="button" class="bg-gastro-accent text-white text-xs font-bold min-h-[44px] py-2 rounded-md hover:bg-gastro-primary transition" onclick="asignarPostulanteManual(${pId})">📌 Asignar a Vacante</button>
       </div>
     `;
     container.appendChild(card);
   });
 }
 
-function asignarPostulanteManual(postulanteId) {
+async function asignarAlElegirVacante(postulanteId) {
   const select = document.getElementById(`select-vacante-pend-${postulanteId}`);
-  const vacanteId = select ? select.value : null;
-
-  if (!vacanteId) return mostrarAviso("Elegí una vacante libre", "error");
-
-  db.run("UPDATE vacantes SET postulante_id = ? WHERE id = ?", [
-    postulanteId,
-    vacanteId,
-  ]);
-  guardarCambiosBD();
-  renderizarTodo();
-  mostrarAviso("Postulante asignado");
+  if (!select || !select.value) return;
+  await asignarPostulanteManual(postulanteId);
 }
 
-function reasignarPostulante(vacanteActualId, postulanteId) {
-  const resVac = db.exec(
-    `
-    SELECT v.id, l.nombre, v.tipo_puesto, v.turno 
-    FROM vacantes v 
-    LEFT JOIN locales l ON v.local_id = l.id 
-    WHERE v.postulante_id IS NULL AND v.id != ?
-  `,
-    [vacanteActualId],
-  );
+async function asignarPostulanteManual(postulanteId) {
+  const select = document.getElementById(`select-vacante-pend-${postulanteId}`);
+  const rowId = select ? select.value : null;
 
-  if (!resVac.length || !resVac[0].values.length) {
-    return mostrarAviso("No hay vacantes libres", "error");
+  if (!rowId) return mostrarAviso("Elegí una vacante libre", "error");
+
+  const postulante = datosGlobales.pendientes.find(p => String(p.id) === String(postulanteId));
+  if (!postulante) return mostrarAviso("No se encontró al postulante", "error");
+
+  if (!normalizarCuil(postulante.cuil)) {
+    if (select) select.value = "";
+    return mostrarAviso("El postulante necesita CUIL para asignar", "error");
   }
 
-  let promptText = "Ingresa el ID de la nueva vacante:\n\n";
-  resVac[0].values.forEach(([vId, lNom, pTipo, pTurno]) => {
-    promptText += `ID #${vId}: ${lNom || "Sin Local"} (${pTipo}/${pTurno})\n`;
-  });
-
-  const nuevaVacanteId = prompt(promptText);
-  if (!nuevaVacanteId) return;
-
-  db.run(
-    "UPDATE vacantes SET postulante_id = NULL, estado = 'PENDIENTE' WHERE id = ?",
-    [vacanteActualId],
-  );
-  db.run("UPDATE vacantes SET postulante_id = ? WHERE id = ?", [
-    postulanteId,
-    nuevaVacanteId,
-  ]);
-
-  guardarCambiosBD();
-  renderizarTodo();
-  mostrarAviso("Postulante reasignado");
-}
-
-// FORMULARIO DE INGRESO — validación en vivo
-const IDS_CAMPOS_POSTULANTE = [
-  "post-nombre",
-  "post-apellido",
-  "post-telefono",
-  "post-tel-emergencia",
-  "post-fecha-nac",
-  "post-nacionalidad",
-  "post-cuil",
-  "post-sexo",
-  "post-direccion",
-  "post-cp",
-  "post-localidad",
-  "post-email",
-];
-
-const REGEX_NOMBRE = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,60}$/;
-const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-function soloDigitos(valor) {
-  return (valor || "").replace(/\D/g, "");
-}
-
-function edadDesdeFecha(fechaStr) {
-  const fecha = new Date(`${fechaStr}T00:00:00`);
-  if (Number.isNaN(fecha.getTime())) return null;
-  const hoy = new Date();
-  let edad = hoy.getFullYear() - fecha.getFullYear();
-  const mes = hoy.getMonth() - fecha.getMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < fecha.getDate())) edad -= 1;
-  return edad;
-}
-
-function esCuilValido(cuil) {
-  const n = soloDigitos(cuil);
-  if (n.length !== 11) return false;
-  const prefijosOk = ["20", "23", "24", "27", "30", "33"];
-  if (!prefijosOk.includes(n.slice(0, 2))) return false;
-  const multiplicadores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
-  let suma = 0;
-  for (let i = 0; i < 10; i++) suma += Number(n[i]) * multiplicadores[i];
-  let digito = 11 - (suma % 11);
-  if (digito === 11) digito = 0;
-  if (digito === 10) return false;
-  return digito === Number(n[10]);
-}
-
-function formatearCuil(valor) {
-  const n = soloDigitos(valor).slice(0, 11);
-  if (n.length <= 2) return n;
-  if (n.length <= 10) return `${n.slice(0, 2)}-${n.slice(2)}`;
-  return `${n.slice(0, 2)}-${n.slice(2, 10)}-${n.slice(10)}`;
-}
-
-function errorCampoPostulante(id, valor) {
-  const texto = (valor || "").trim();
-  const tel = soloDigitos(document.getElementById("post-telefono")?.value || "");
-  const telEmerg = soloDigitos(
-    document.getElementById("post-tel-emergencia")?.value || "",
-  );
-
-  switch (id) {
-    case "post-nombre":
-      if (!texto) return "Ingresá tu nombre.";
-      if (!REGEX_NOMBRE.test(texto))
-        return "Usá solo letras, espacios o guiones (mínimo 2).";
-      return "";
-    case "post-apellido":
-      if (!texto) return "Ingresá tu apellido.";
-      if (!REGEX_NOMBRE.test(texto))
-        return "Usá solo letras, espacios o guiones (mínimo 2).";
-      return "";
-    case "post-telefono":
-      if (!tel) return "Ingresá tu celular.";
-      if (tel.length < 10 || tel.length > 13)
-        return "El celular debe tener entre 10 y 13 dígitos.";
-      return "";
-    case "post-tel-emergencia":
-      if (!telEmerg) return "Ingresá un teléfono de emergencia.";
-      if (telEmerg.length < 10 || telEmerg.length > 13)
-        return "Debe tener entre 10 y 13 dígitos.";
-      if (tel && tel === telEmerg)
-        return "Debe ser distinto al celular del postulante.";
-      return "";
-    case "post-fecha-nac": {
-      if (!texto) return "Indicá tu fecha de nacimiento.";
-      const edad = edadDesdeFecha(texto);
-      if (edad === null) return "La fecha no es válida.";
-      if (edad < 16) return "Debés tener al menos 16 años.";
-      if (edad > 80) return "Revisá la fecha: la edad no parece correcta.";
-      return "";
-    }
-    case "post-nacionalidad":
-      if (!texto) return "Ingresá tu nacionalidad.";
-      if (!REGEX_NOMBRE.test(texto))
-        return "Usá solo letras (mínimo 2 caracteres).";
-      return "";
-    case "post-cuil":
-      if (!soloDigitos(texto)) return "Ingresá tu CUIL.";
-      if (soloDigitos(texto).length !== 11)
-        return "El CUIL debe tener 11 dígitos (ej. 20-12345678-9).";
-      if (!esCuilValido(texto))
-        return "El CUIL no es válido. Revisá el número.";
-      return "";
-    case "post-sexo":
-      if (!texto) return "Seleccioná una opción.";
-      return "";
-    case "post-direccion":
-      if (!texto) return "Ingresá tu domicilio.";
-      if (texto.length < 8)
-        return "La dirección es demasiado corta (calle y número).";
-      return "";
-    case "post-cp": {
-      const cp = soloDigitos(texto);
-      if (!cp) return "Ingresá el código postal.";
-      if (cp.length < 4 || cp.length > 8)
-        return "El CP argentino tiene entre 4 y 8 dígitos.";
-      return "";
-    }
-    case "post-localidad":
-      if (!texto) return "Ingresá la localidad.";
-      if (texto.length < 2) return "La localidad es demasiado corta.";
-      return "";
-    case "post-email":
-      if (!texto) return "Ingresá tu correo electrónico.";
-      if (!REGEX_EMAIL.test(texto.toLowerCase()))
-        return "El formato del email no es válido.";
-      return "";
-    default:
-      return "";
-  }
-}
-
-function pintarEstadoCampo(el, error, { mostrarOk = true } = {}) {
-  const msg = document.getElementById(`${el.id}-error`);
-  el.classList.remove("input-error", "input-ok");
-
-  if (error) {
-    el.classList.add("input-error");
-    el.setAttribute("aria-invalid", "true");
-    if (msg) msg.textContent = error;
-    return;
+  const existente = buscarVacantePorCuilLocal(postulante.cuil);
+  if (existente) {
+    if (select) select.value = "";
+    return mostrarAviso(`CUIL ya asignado en fila #${existente.rowId} (${existente.marca})`, "error");
   }
 
-  el.setAttribute("aria-invalid", "false");
-  if (msg) msg.textContent = "";
-  if (mostrarOk && String(el.value || "").trim()) el.classList.add("input-ok");
-}
+  const pestanaDestino = estadoUI.marcaActiva === "SABORES" ? "VACANTES SABORES" : "VACANTES EXTREMAS";
 
-function validarCampoPostulante(el, { forzar = false } = {}) {
-  if (!el) return true;
-  if (!forzar && el.dataset.touched !== "1") {
-    pintarEstadoCampo(el, "", { mostrarOk: false });
-    return true;
-  }
-  const error = errorCampoPostulante(el.id, el.value);
-  pintarEstadoCampo(el, error);
-  return !error;
-}
+  mostrarAviso("Asignando candidato...", "ok");
 
-function validarFormularioPostulanteCompleto() {
-  let primeroInvalido = null;
-  let ok = true;
-
-  IDS_CAMPOS_POSTULANTE.forEach((id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.dataset.touched = "1";
-    const valido = validarCampoPostulante(el, { forzar: true });
-    if (!valido && !primeroInvalido) primeroInvalido = el;
-    if (!valido) ok = false;
-  });
-
-  const resumen = document.getElementById("form-postulante-resumen");
-  if (!ok) {
-    if (resumen)
-      resumen.textContent = "Revisá los campos marcados antes de enviar.";
-    primeroInvalido?.focus();
-  } else if (resumen) {
-    resumen.textContent = "";
-  }
-
-  return ok;
-}
-
-function resetearValidacionFormulario(form) {
-  IDS_CAMPOS_POSTULANTE.forEach((id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    delete el.dataset.touched;
-    pintarEstadoCampo(el, "", { mostrarOk: false });
-  });
-  const resumen = document.getElementById("form-postulante-resumen");
-  if (resumen) resumen.textContent = "";
-  form?.reset();
-}
-
-function initValidacionFormularioPostulante() {
-  const form = document.getElementById("form-postulante");
-  if (!form) return;
-
-  IDS_CAMPOS_POSTULANTE.forEach((id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-
-    const alEscribir = () => {
-      if (id === "post-cuil") {
-        const cursorAlFinal =
-          el.selectionStart === el.value.length &&
-          el.selectionEnd === el.value.length;
-        el.value = formatearCuil(el.value);
-        if (cursorAlFinal) el.setSelectionRange(el.value.length, el.value.length);
+  try {
+    const json = await enviarPostApi({
+      action: "asignarPostulante",
+      data: {
+        pestana: pestanaDestino,
+        rowId: parseInt(rowId, 10),
+        postulante: postulante
       }
-      if (id === "post-telefono" || id === "post-tel-emergencia") {
-        el.value = soloDigitos(el.value).slice(0, 13);
-      }
-      if (id === "post-cp") {
-        el.value = soloDigitos(el.value).slice(0, 8);
-      }
-      if (el.dataset.touched === "1") validarCampoPostulante(el, { forzar: true });
-      if (id === "post-telefono" || id === "post-tel-emergencia") {
-        const otroId =
-          id === "post-telefono" ? "post-tel-emergencia" : "post-telefono";
-        const otro = document.getElementById(otroId);
-        if (otro?.dataset.touched === "1")
-          validarCampoPostulante(otro, { forzar: true });
-      }
-    };
-
-    el.addEventListener("input", alEscribir);
-    el.addEventListener("change", alEscribir);
-    el.addEventListener("blur", () => {
-      el.dataset.touched = "1";
-      validarCampoPostulante(el, { forzar: true });
     });
-  });
+
+    if (json.status === "success") {
+      mostrarAviso("Asignado (permanece en Ingresos)", "ok");
+      if (select) select.value = "";
+      cargarDatosDesdeBackend({ silencioso: true });
+    } else {
+      if (select) select.value = "";
+      mostrarAviso(json.message || "Error al asignar", "error");
+    }
+  } catch (error) {
+    if (select) select.value = "";
+    mostrarAviso(error.message || "Error de conexión", "error");
+  }
 }
 
-function enviarFormularioPostulante(e) {
+async function liberarVacante(rowId) {
+  const vacante = obtenerVacantePorRowId(rowId);
+  if (!vacante || !vacante.postulante) {
+    return mostrarAviso("No hay candidato para liberar", "error");
+  }
+
+  const nombre = `${vacante.postulante.nombre || ""} ${vacante.postulante.apellido || ""}`.trim();
+  if (!confirm(`¿Devolver a Ingresos a ${nombre || "este candidato"}?`)) return;
+
+  mostrarAviso("Liberando vacante...", "ok");
+
+  try {
+    const json = await enviarPostApi({
+      action: "liberarVacante",
+      data: {
+        pestana: obtenerPestanaActiva(),
+        rowId
+      }
+    });
+
+    if (json.status === "success") {
+      mostrarAviso("Candidato devuelto a Ingresos", "ok");
+      cargarDatosDesdeBackend({ silencioso: true });
+    } else {
+      mostrarAviso(json.message || "Error al liberar", "error");
+    }
+  } catch (error) {
+    mostrarAviso(error.message || "Error de conexión", "error");
+  }
+}
+
+// ==========================================
+// EDICIÓN OPERATIVA (COLUMNAS A-M)
+// ==========================================
+function cerrarTodosLosModales() {
+  ["modal-operativa", "modal-postulante", "modal-reasignar"].forEach((id) => {
+    const modal = document.getElementById(id);
+    if (modal) {
+      modal.classList.add("hidden");
+      modal.setAttribute("aria-hidden", "true");
+    }
+  });
+  document.body.classList.remove("modal-abierto");
+}
+
+function abrirEditorOperativa(rowId) {
+  const vacante = obtenerVacantePorRowId(rowId);
+  if (!vacante) return mostrarAviso("No se encontró la vacante", "error");
+
+  document.getElementById("edit-row-id").value = rowId;
+  document.getElementById("edit-capacitador").value = vacante.capacitador || "";
+  document.getElementById("edit-regional").value = vacante.regional || "";
+  document.getElementById("edit-zonal").value = vacante.zonal || "";
+  document.getElementById("edit-local").value = vacante.local || "";
+  document.getElementById("edit-local-entrenamiento").value = vacante.localEntrenamiento || "";
+  document.getElementById("edit-part").value = vacante.part || "";
+  document.getElementById("edit-full").value = vacante.full || "";
+  document.getElementById("edit-notas").value = vacante.notas || "";
+  document.getElementById("edit-fecha").value = fechaParaInput(vacante.fecha);
+  document.getElementById("edit-hora").value = horaParaInput(vacante.hora);
+  document.getElementById("edit-fecha-ingreso").value = fechaParaInput(vacante.fechaIngreso);
+  document.getElementById("edit-huella").checked = esCheckboxMarcado(vacante.huella);
+  document.getElementById("edit-enviado").checked = esCheckboxMarcado(vacante.enviado);
+
+  const subtitulo = document.getElementById("modal-operativa-subtitulo");
+  if (subtitulo) {
+    subtitulo.textContent = `${obtenerPestanaActiva()} · Fila ${rowId}`;
+  }
+
+  const modal = document.getElementById("modal-operativa");
+  if (modal) {
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-abierto");
+  }
+}
+
+function cerrarEditorOperativa() {
+  cerrarTodosLosModales();
+}
+
+async function guardarEditorOperativa(e) {
   if (e) e.preventDefault();
-  if (!db) return;
-  if (!validarFormularioPostulanteCompleto()) return;
 
-  const nombre = document.getElementById("post-nombre").value.trim();
-  const apellido = document.getElementById("post-apellido").value.trim();
-  const telefono = soloDigitos(document.getElementById("post-telefono").value);
-  const telEmergencia = soloDigitos(
-    document.getElementById("post-tel-emergencia").value,
-  );
-  const fechaNac = document.getElementById("post-fecha-nac").value;
-  const nacionalidad = document.getElementById("post-nacionalidad").value.trim();
-  const cuil = formatearCuil(document.getElementById("post-cuil").value);
-  const sexo = document.getElementById("post-sexo").value;
-  const direccion = document.getElementById("post-direccion").value.trim();
-  const cp = soloDigitos(document.getElementById("post-cp").value);
-  const localidad = document.getElementById("post-localidad").value.trim();
-  const email = document.getElementById("post-email").value.trim().toLowerCase();
+  const rowId = parseInt(document.getElementById("edit-row-id").value, 10);
+  if (!rowId) return mostrarAviso("Fila inválida", "error");
 
-  const ahora = new Date();
-  const altasRrhh =
-    ahora.toLocaleDateString() + " " + ahora.toLocaleTimeString();
+  const operativa = {
+    capacitador: document.getElementById("edit-capacitador").value.trim(),
+    regional: document.getElementById("edit-regional").value.trim(),
+    zonal: document.getElementById("edit-zonal").value.trim(),
+    local: document.getElementById("edit-local").value.trim(),
+    localEntrenamiento: document.getElementById("edit-local-entrenamiento").value.trim(),
+    part: document.getElementById("edit-part").value.trim(),
+    full: document.getElementById("edit-full").value.trim(),
+    notas: document.getElementById("edit-notas").value.trim(),
+    fecha: document.getElementById("edit-fecha").value,
+    hora: document.getElementById("edit-hora").value,
+    fechaIngreso: document.getElementById("edit-fecha-ingreso").value,
+    huella: document.getElementById("edit-huella").checked,
+    enviado: document.getElementById("edit-enviado").checked
+  };
 
-  db.run(
-    `
-    INSERT INTO postulantes (
-      nombre, apellido, telefono, tel_emergencia, fecha_nacimiento, nacionalidad,
-      cuil, sexo, direccion, cp, localidad, email, altas_rrhh
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `,
-    [
-      nombre,
-      apellido,
-      telefono,
-      telEmergencia,
-      fechaNac,
-      nacionalidad,
-      cuil,
-      sexo,
-      direccion,
-      cp,
-      localidad,
-      email,
-      altasRrhh,
-    ],
-  );
+  mostrarAviso("Guardando cambios...", "ok");
 
-  guardarCambiosBD();
-  mostrarAviso("Formulario enviado");
-
-  resetearValidacionFormulario(e.target);
-  mostrarSeccion("pendientes-asignacion");
-}
-
-// COPIADO
-function copiarTextoAlPortapapeles(texto) {
-  if (navigator.clipboard && window.isSecureContext) {
-    return navigator.clipboard.writeText(texto);
-  } else {
-    const textarea = document.createElement("textarea");
-    textarea.value = texto;
-    textarea.style.position = "fixed";
-    textarea.style.left = "-999999px";
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-
-    return new Promise((resolve, reject) => {
-      document.execCommand("copy") ? resolve() : reject();
-      textarea.remove();
+  try {
+    const json = await enviarPostApi({
+      action: "guardarOperativa",
+      data: {
+        pestana: obtenerPestanaActiva(),
+        rowId,
+        operativa
+      }
     });
+
+    if (json.status === "success") {
+      mostrarAviso("Vacante actualizada", "ok");
+      cerrarEditorOperativa();
+      cargarDatosDesdeBackend({ silencioso: true });
+    } else {
+      mostrarAviso(json.message || "Error al guardar", "error");
+    }
+  } catch (error) {
+    console.error("Error al guardar operativa:", error);
+    mostrarAviso(error.message || "Error de conexión", "error");
   }
 }
 
-function copiarMensajeCitacion(vacanteId) {
-  const tr = document.querySelector(`tr[data-vacante-id="${vacanteId}"]`);
-  if (!tr) return mostrarAviso("No se encontró la vacante", "error");
+// ==========================================
+// EDICIÓN CANDIDATO (COLUMNAS N-Z)
+// ==========================================
+function abrirEditorPostulante(rowId) {
+  const vacante = obtenerVacantePorRowId(rowId);
+  if (!vacante) return mostrarAviso("No se encontró la vacante", "error");
 
-  const locId = tr.querySelector(".field-loc").value;
-  const puesto = tr.querySelector(".field-tipo").value;
-  const turno = tr.querySelector(".field-turno").value;
-  const fecha = tr.querySelector(".field-fecha").value || "[FECHA]";
-  const hora = tr.querySelector(".field-hora").value || "[HORA]";
+  const p = vacante.postulante || {};
 
-  let localNombre = "[LOCAL]";
-  let localDireccion = "[DIRECCIÓN LOCAL]";
+  document.getElementById("edit-cand-row-id").value = rowId;
+  document.getElementById("edit-cand-nombre").value = p.nombre || "";
+  document.getElementById("edit-cand-apellido").value = p.apellido || "";
+  document.getElementById("edit-cand-tel").value = p.tel || "";
+  document.getElementById("edit-cand-tel-emergencia").value = p.telEmergencia || "";
+  document.getElementById("edit-cand-fecha-nac").value = fechaParaInput(p.fechaNacimiento);
+  document.getElementById("edit-cand-nac").value = p.nac || "";
+  document.getElementById("edit-cand-cuil").value = p.cuil || "";
+  document.getElementById("edit-cand-sexo").value = p.sexo || "";
+  document.getElementById("edit-cand-direccion").value = p.direccion || "";
+  document.getElementById("edit-cand-cp").value = p.cp || "";
+  document.getElementById("edit-cand-localidad").value = p.localidad || "";
+  document.getElementById("edit-cand-email").value = p.email || "";
+  document.getElementById("edit-cand-altas").value = p.altasRrhh || "";
 
-  if (locId) {
-    const res = db.exec(`SELECT nombre, direccion FROM locales WHERE id = ?`, [
-      locId,
-    ]);
-    if (res.length && res[0].values.length) {
-      localNombre = res[0].values[0][0];
-      localDireccion = res[0].values[0][1];
+  const subtitulo = document.getElementById("modal-postulante-subtitulo");
+  if (subtitulo) {
+    subtitulo.textContent = `${obtenerPestanaActiva()} · Fila ${rowId}`;
+  }
+
+  const modal = document.getElementById("modal-postulante");
+  if (modal) {
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-abierto");
+  }
+}
+
+function cerrarEditorPostulante() {
+  cerrarTodosLosModales();
+}
+
+async function guardarEditorPostulante(e) {
+  if (e) e.preventDefault();
+
+  const rowId = parseInt(document.getElementById("edit-cand-row-id").value, 10);
+  if (!rowId) return mostrarAviso("Fila inválida", "error");
+
+  const postulante = {
+    nombre: document.getElementById("edit-cand-nombre").value.trim(),
+    apellido: document.getElementById("edit-cand-apellido").value.trim(),
+    tel: document.getElementById("edit-cand-tel").value.trim(),
+    telEmergencia: document.getElementById("edit-cand-tel-emergencia").value.trim(),
+    fechaNacimiento: document.getElementById("edit-cand-fecha-nac").value,
+    nac: document.getElementById("edit-cand-nac").value.trim(),
+    cuil: document.getElementById("edit-cand-cuil").value.trim(),
+    sexo: document.getElementById("edit-cand-sexo").value,
+    direccion: document.getElementById("edit-cand-direccion").value.trim(),
+    cp: document.getElementById("edit-cand-cp").value.trim(),
+    localidad: document.getElementById("edit-cand-localidad").value.trim(),
+    email: document.getElementById("edit-cand-email").value.trim(),
+    altasRrhh: document.getElementById("edit-cand-altas").value.trim()
+  };
+
+  if (normalizarCuil(postulante.cuil)) {
+    const existente = buscarVacantePorCuilLocal(postulante.cuil, {
+      pestana: obtenerPestanaActiva(),
+      rowId
+    });
+    if (existente) {
+      return mostrarAviso(`CUIL ya asignado en fila #${existente.rowId} (${existente.marca})`, "error");
     }
   }
 
-  let textoPuesto = `${puesto} TIME`;
-  if (puesto === "GT") textoPuesto = "GERENTE";
-  if (puesto === "ET") textoPuesto = "ENCARGADO DE TURNO";
+  mostrarAviso("Guardando candidato...", "ok");
 
-  let horarioPrimerDia = "A CONFIRMAR CON EL GERENTE";
-  if (turno === "NOCHE") horarioPrimerDia = "18 A 23hs*";
-  else if (turno === "MEDIO") horarioPrimerDia = "12 A 17hs*";
-  else if (turno === "MAÑANA") horarioPrimerDia = "09 A 14hs*";
-  else if (turno === "TARDE") horarioPrimerDia = "14 A 19hs*";
-
-  const mensaje = `🎉 ¡Hola! ¿Cómo estás?
-¡Tenemos una buena noticia! 🙌 Fuiste seleccionado/a para sumarte a nuestro equipo.
-👨‍🍳 *PUESTO: EMPLEADO/A POLIVALENTE*
-🕘 *JORNADA: ${textoPuesto} – ROTATIVO TURNO ${turno}*
-
-✅ Próximos pasos
-1️⃣ *Completá el formulario de ingreso* 📝
-👉 https://forms.gle/AdNVGTq6UdE56Vnp8
-2️⃣ *Presentate en nuestra Oficina de Selección* para realizar tu Bienvenida e Ingreso.
-
-📍 Dirección: Florida 428, CABA
-📅 Fecha: ${fecha}
-🕘 Horario: ${hora} (*Presentate 15 minutos antes del horario pactado*)
-
-3️⃣ *Traé la siguiente documentación* (obligatoria):
-* DNI formato físico.
-* Carnet o constancia del Curso de Manipulación de Alimentos.
-* Certificado de Antecedentes Penales.
-
-📍 Tu local asignado será:
-*SABORES ${localNombre} (${localDireccion})*
-*EL HORARIO DE TU PRIMER DIA VA A SER:
-${horarioPrimerDia}`;
-
-  copiarTextoAlPortapapeles(mensaje)
-    .then(() =>
-      alert(
-        `📋 ¡Mensaje de citación copiado con éxito!\n\nLocal: SABORES ${localNombre}`,
-      ),
-    )
-    .catch(() => alert("Error al copiar."));
-}
-
-function copiarAvisoGerente(vacanteId) {
-  const tr = document.querySelector(`tr[data-vacante-id="${vacanteId}"]`);
-  if (!tr) return mostrarAviso("No se encontró la vacante", "error");
-
-  const locId = tr.querySelector(".field-loc").value;
-  const puesto = tr.querySelector(".field-tipo").value;
-  const turno = tr.querySelector(".field-turno").value;
-  const fechaIngreso = tr.querySelector(".field-fecha-ingreso").value;
-
-  if (!fechaIngreso) {
-    alert(
-      "⚠️ Por favor establece la FECHA DE INGRESO antes de enviar el aviso.",
-    );
-    return;
-  }
-
-  const resVac = db.exec(
-    `
-    SELECT l.nombre, p.nombre, p.apellido, p.telefono 
-    FROM vacantes v
-    LEFT JOIN locales l ON v.local_id = l.id
-    LEFT JOIN postulantes p ON v.postulante_id = p.id
-    WHERE v.id = ?
-  `,
-    [vacanteId],
-  );
-
-  if (!resVac.length || !resVac[0].values.length) {
-    alert("⚠️ No se encontraron datos del postulante.");
-    return;
-  }
-
-  const [localNom, postNombre, postApellido, postTel] = resVac[0].values[0];
-
-  let horarioPrimerDia = "A CONFIRMAR";
-  if (turno === "NOCHE") horarioPrimerDia = "18 A 23hs";
-  else if (turno === "MEDIO") horarioPrimerDia = "12 A 17hs";
-  else if (turno === "MAÑANA") horarioPrimerDia = "09 A 14hs";
-  else if (turno === "TARDE") horarioPrimerDia = "14 A 19hs";
-
-  let tipoJornada = "PART-TIME";
-  if (puesto === "FULL") tipoJornada = "FULL-TIME";
-  else if (puesto === "GT") tipoJornada = "GERENTE";
-  else if (puesto === "ET") tipoJornada = "ENCARGADO DE TURNO";
-
-  const mensajeGerente = `*SABORES ${localNom || "[LOCAL]"}*
-HS ASIGNADO: ${tipoJornada} ${turno}
-TEL: ${postTel || "[SIN TEL]"}
-NOMBRE: ${postNombre || ""} ${postApellido || ""}
-*COMIENZA: ${fechaIngreso} - ${horarioPrimerDia}*
-
-⚠️⚠️ *HUELLA REGISTRADA*⚠️⚠️`;
-
-  copiarTextoAlPortapapeles(mensajeGerente)
-    .then(() => {
-      db.run("UPDATE vacantes SET estado = 'ENVIADO' WHERE id = ?", [
-        vacanteId,
-      ]);
-      guardarCambiosBD();
-      renderizarTablaVacantes();
-      alert(`📲 ¡Aviso al gerente copiado!\n\nEstado actualizado a ENVIADO.`);
-    })
-    .catch(() => alert("Error al copiar."));
-}
-
-// ABMs Y UTILIDADES
-function agregarNuevaVacante() {
-  if (!db) return alert("Cargando base de datos...");
-  db.run(
-    `INSERT INTO vacantes (tipo_puesto, turno, estado, fecha) VALUES ('PART', 'ROTA', 'PENDIENTE', '2026-08-25')`,
-  );
-  guardarCambiosBD();
-  renderizarTablaVacantes();
-}
-
-function eliminarVacante(id) {
-  if (confirm("¿Deseas eliminar esta vacante de la lista?")) {
-    db.run("DELETE FROM vacantes WHERE id = ?", [id]);
-    guardarCambiosBD();
-    renderizarTablaVacantes();
-  }
-}
-
-function guardarCambiosTablaOperativa() {
-  if (!db) return;
-  const rows = document.querySelectorAll(
-    "#body-tabla-vacantes tr[data-vacante-id]",
-  );
-
-  rows.forEach((tr) => {
-    const id = tr.dataset.vacanteId;
-    const capId = tr.querySelector(".field-cap").value || null;
-    const regId = tr.querySelector(".field-reg").value || null;
-    const zonId = tr.querySelector(".field-zon").value || null;
-    const locId = tr.querySelector(".field-loc").value || null;
-    const tipo = tr.querySelector(".field-tipo").value;
-    const turno = tr.querySelector(".field-turno").value;
-    const notas = tr.querySelector(".field-notas").value;
-    const fecha = tr.querySelector(".field-fecha").value;
-    const hora = tr.querySelector(".field-hora").value;
-    const estado = tr.querySelector(".field-estado").value;
-    const fechaIngreso = tr.querySelector(".field-fecha-ingreso").value || null;
-
-    db.run(
-      `
-      UPDATE vacantes SET 
-        capacitador_id = ?, regional_id = ?, zonal_id = ?, local_id = ?,
-        tipo_puesto = ?, turno = ?, notas_solicitud = ?, fecha = ?, hora = ?, estado = ?, fecha_ingreso = ?
-      WHERE id = ?
-    `,
-      [
-        capId,
-        regId,
-        zonId,
-        locId,
-        tipo,
-        turno,
-        notas,
-        fecha,
-        hora,
-        estado,
-        fechaIngreso,
-        id,
-      ],
-    );
-  });
-
-  guardarCambiosBD();
-  alert("💾 ¡Cambios guardados!");
-  renderizarTablaVacantes();
-}
-
-function liberarVacante(vacanteId) {
-  if (confirm("¿Liberar vacante?")) {
-    db.run(
-      "UPDATE vacantes SET postulante_id = NULL, estado = 'PENDIENTE' WHERE id = ?",
-      [vacanteId],
-    );
-    guardarCambiosBD();
-    renderizarTodo();
-  }
-}
-
-function renderizarABMs() {
-  renderSimpleList("regionales", "lista-regionales");
-  renderSimpleList("zonales", "lista-zonales");
-  renderSimpleList("capacitadores", "lista-capacitadores");
-  renderSimpleList("horarios_jornada", "lista-horarios", "hora");
-  renderLocalesList();
-}
-
-function renderSimpleList(tabla, elementId, colDisplay = "nombre") {
-  const ul = document.getElementById(elementId);
-  if (!ul) return;
-  ul.innerHTML = "";
-  const res = db.exec(`SELECT id, ${colDisplay} FROM ${tabla}`);
-  if (res.length) {
-    res[0].values.forEach(([id, val]) => {
-      ul.innerHTML += `<li class="py-1.5 flex justify-between items-center text-xs text-slate-700"><span>${val}</span> <button class="text-rose-500 hover:text-rose-700 font-bold" onclick="eliminarMaestro('${tabla}', ${id})">❌</button></li>`;
+  try {
+    const json = await enviarPostApi({
+      action: "guardarPostulante",
+      data: {
+        pestana: obtenerPestanaActiva(),
+        rowId,
+        postulante
+      }
     });
+
+    if (json.status === "success") {
+      mostrarAviso("Candidato actualizado", "ok");
+      cerrarEditorPostulante();
+      cargarDatosDesdeBackend({ silencioso: true });
+    } else {
+      mostrarAviso(json.message || "Error al guardar candidato", "error");
+    }
+  } catch (error) {
+    console.error("Error al guardar candidato:", error);
+    mostrarAviso(error.message || "Error de conexión", "error");
   }
 }
 
-function renderLocalesList() {
-  const ul = document.getElementById("lista-locales");
-  if (!ul) return;
-  ul.innerHTML = "";
-  const res = db.exec("SELECT id, nombre, direccion FROM locales");
-  if (res.length) {
-    res[0].values.forEach(([id, nom, dir]) => {
-      ul.innerHTML += `<li class="py-1.5 flex justify-between items-center text-xs"><div class="truncate pr-2"><b class="text-gastro-primary">${nom}</b><br><span class="text-[10px] text-slate-400">📍 ${dir}</span></div> <button class="text-rose-500 hover:text-rose-700 font-bold" onclick="eliminarMaestro('locales', ${id})">❌</button></li>`;
+// ==========================================
+// REASIGNAR CANDIDATO (MARCA ACTIVA)
+// ==========================================
+function abrirModalReasignar(rowIdOrigen) {
+  const vacante = obtenerVacantePorRowId(rowIdOrigen);
+  if (!vacante || !vacante.postulante) {
+    return mostrarAviso("No hay candidato para reasignar", "error");
+  }
+
+  const libres = obtenerVacantesLibresMarcaActiva(rowIdOrigen);
+  if (!libres.length) {
+    return mostrarAviso("No hay vacantes libres en esta marca", "error");
+  }
+
+  document.getElementById("reasignar-row-origen").value = rowIdOrigen;
+
+  const select = document.getElementById("reasignar-row-destino");
+  if (select) {
+    let html = `<option value="">Elegir vacante destino...</option>`;
+    libres.forEach((v) => {
+      html += `<option value="${v.rowId}">${escapeHtml(etiquetaVacante(v))}</option>`;
     });
+    select.innerHTML = html;
+    select.value = "";
+  }
+
+  const subtitulo = document.getElementById("modal-reasignar-subtitulo");
+  if (subtitulo) {
+    const p = vacante.postulante;
+    subtitulo.textContent = `${obtenerPestanaActiva()} · Origen fila ${rowIdOrigen} · ${p.nombre || ""} ${p.apellido || ""} · CUIL ${p.cuil || "-"}`;
+  }
+
+  const modal = document.getElementById("modal-reasignar");
+  if (modal) {
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-abierto");
   }
 }
 
-function guardarLocal(e) {
-  if (e) e.preventDefault();
-  if (!db) return;
-  const nom = document.getElementById("loc-nombre").value;
-  const dir = document.getElementById("loc-direccion").value;
-  db.run("INSERT INTO locales (nombre, direccion) VALUES (?, ?)", [nom, dir]);
-  guardarCambiosBD();
-  renderizarTodo();
-  e.target.reset();
+function cerrarModalReasignar() {
+  cerrarTodosLosModales();
 }
 
-function guardarCapacitador(e) {
+async function guardarReasignacion(e) {
   if (e) e.preventDefault();
-  if (!db) return;
-  const nom = document.getElementById("cap-nombre").value;
-  db.run("INSERT INTO capacitadores (nombre) VALUES (?)", [nom]);
-  guardarCambiosBD();
-  renderizarTodo();
-  e.target.reset();
-}
 
-function guardarHorario(e) {
-  if (e) e.preventDefault();
-  if (!db) return;
-  const hora = document.getElementById("hor-valor").value;
-  db.run("INSERT INTO horarios_jornada (hora) VALUES (?)", [hora]);
-  guardarCambiosBD();
-  renderizarTodo();
-  e.target.reset();
-}
+  const rowIdOrigen = parseInt(document.getElementById("reasignar-row-origen").value, 10);
+  const rowIdDestino = parseInt(document.getElementById("reasignar-row-destino").value, 10);
 
-function guardarRegional(e) {
-  if (e) e.preventDefault();
-  if (!db) return;
-  const nom = document.getElementById("reg-nombre").value;
-  db.run("INSERT INTO regionales (nombre) VALUES (?)", [nom]);
-  guardarCambiosBD();
-  renderizarTodo();
-  e.target.reset();
-}
+  if (!rowIdOrigen || !rowIdDestino) {
+    return mostrarAviso("Elegí una vacante destino", "error");
+  }
 
-function guardarZonal(e) {
-  if (e) e.preventDefault();
-  if (!db) return;
-  const nom = document.getElementById("zon-nombre").value;
-  db.run("INSERT INTO zonales (nombre) VALUES (?)", [nom]);
-  guardarCambiosBD();
-  renderizarTodo();
-  e.target.reset();
-}
+  mostrarAviso("Reasignando candidato...", "ok");
 
-function eliminarMaestro(tabla, id) {
-  if (confirm("¿Eliminar registro?")) {
-    db.run(`DELETE FROM ${tabla} WHERE id = ?`, [id]);
-    guardarCambiosBD();
-    renderizarTodo();
+  try {
+    const json = await enviarPostApi({
+      action: "reasignarPostulante",
+      data: {
+        pestana: obtenerPestanaActiva(),
+        rowIdOrigen,
+        rowIdDestino
+      }
+    });
+
+    if (json.status === "success") {
+      mostrarAviso("Candidato reasignado", "ok");
+      cerrarModalReasignar();
+      cargarDatosDesdeBackend({ silencioso: true });
+    } else {
+      mostrarAviso(json.message || "Error al reasignar", "error");
+    }
+  } catch (error) {
+    mostrarAviso(error.message || "Error de conexión", "error");
   }
 }
 
+// ==========================================
+// NAVEGACIÓN Y UTILIDADES
+// ==========================================
 function mostrarSeccion(id) {
-  document
-    .querySelectorAll(".seccion-content")
-    .forEach((s) => s.classList.add("hidden"));
-
+  document.querySelectorAll(".seccion-content").forEach((s) => s.classList.add("hidden"));
   const target = document.getElementById(id);
   if (target) target.classList.remove("hidden");
 
@@ -991,11 +889,25 @@ function mostrarSeccion(id) {
     b.classList.toggle("active-nav", b.dataset.seccion === id);
   });
 
+  actualizarTabsMarca(id);
   window.scrollTo({ top: 0, behavior: "smooth" });
-  renderizarTodo();
 }
 
+// Inicialización al cargar la ventana
 window.addEventListener("DOMContentLoaded", () => {
-  initValidacionFormularioPostulante();
-  initDatabase();
+  cargarDatosDesdeBackend({ silencioso: true });
+  iniciarAutoSync();
+
+  ["modal-operativa", "modal-postulante", "modal-reasignar"].forEach((id) => {
+    const modal = document.getElementById(id);
+    if (modal) {
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) cerrarTodosLosModales();
+      });
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") cerrarTodosLosModales();
+  });
 });

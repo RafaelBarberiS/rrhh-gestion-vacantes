@@ -32,155 +32,106 @@
       };
     </script>
 
-    <!-- Carga de sql.js (SQLite Wasm) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
-
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="bg-gastro-bg text-slate-800 antialiased min-h-screen overflow-x-hidden">
     <a href="#contenido-principal" class="skip-link">Saltar al contenido</a>
 
-    <!-- Navbar -->
-    <header
-      class="bg-white border-b border-gastro-border px-4 sm:px-6 py-3 flex justify-between items-center shadow-sm sticky top-0 z-50"
-    >
-      <div class="font-extrabold text-lg sm:text-xl text-gastro-primary tracking-tight min-w-0">
-        GastroBA
-        <span
-          class="text-[10px] sm:text-xs font-semibold text-gastro-accent px-2 py-0.5 bg-gastro-subtle rounded-md ml-1 align-middle"
-          >RRHH</span
-        >
-      </div>
-      <nav
-        class="hidden md:flex gap-2 flex-wrap justify-end"
-        aria-label="Secciones"
-      >
-        <button
-          type="button"
-          onclick="mostrarSeccion('vista-operativa')"
-          class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors text-slate-600 hover:bg-gastro-subtle hover:text-gastro-primary active-nav"
-          data-seccion="vista-operativa"
-        >
-          📋 Vista Operativa
-        </button>
-        <button
-          type="button"
-          onclick="mostrarSeccion('pendientes-asignacion')"
-          class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors text-slate-600 hover:bg-gastro-subtle hover:text-gastro-primary inline-flex items-center gap-1.5"
-          data-seccion="pendientes-asignacion"
-        >
-          📥 Pendientes
-          <span
-            class="badge-pendientes bg-rose-500 text-white rounded-full text-xs font-bold px-2 py-0.5 min-w-[1.25rem] text-center"
-            >0</span
-          >
-        </button>
-        <button
-          type="button"
-          onclick="mostrarSeccion('configuracion')"
-          class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors text-slate-600 hover:bg-gastro-subtle hover:text-gastro-primary"
-          data-seccion="configuracion"
-        >
-          ⚙️ Configuración
-        </button>
-        <button
-          type="button"
-          onclick="mostrarSeccion('simulador-postulante')"
-          class="nav-btn font-semibold text-sm px-4 py-2 rounded-lg transition-colors bg-gastro-accent text-white hover:bg-gastro-primary shadow-sm"
-          data-seccion="simulador-postulante"
-        >
-          📱 Formulario Ingreso
-        </button>
-      </nav>
-    </header>
-
     <main
       id="contenido-principal"
-      class="max-w-[1650px] mx-auto px-4 py-4 sm:p-6 pb-24 md:pb-6"
+      class="max-w-[1650px] mx-auto px-4 py-4 sm:p-6"
     >
-      <!-- VISTA OPERATIVA -->
-      <section id="vista-operativa" class="seccion-content block">
-        <div
-          class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-5"
-        >
-          <div class="min-w-0">
-            <h2 class="text-lg sm:text-xl font-bold text-gastro-primary">
-              Jornada Activa de Vacantes
-            </h2>
-            <p class="text-xs text-slate-500 mt-0.5">
-              Planilla operativa en tiempo real con vinculación directa de
-              postulantes.
-            </p>
-          </div>
-          <div
-            class="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto"
-          >
-            <button
-              type="button"
-              onclick="agregarNuevaVacante()"
-              class="bg-gastro-accent text-white text-xs font-bold min-h-[44px] px-3.5 py-2 rounded-md hover:bg-gastro-hover transition shadow-sm"
-            >
-              ➕ Agregar Vacante
-            </button>
-            <button
-              type="button"
-              onclick="guardarCambiosTablaOperativa()"
-              class="bg-emerald-600 text-white text-xs font-bold min-h-[44px] px-3.5 py-2 rounded-md hover:bg-emerald-700 transition shadow-sm"
-            >
-              💾 Guardar Cambios
-            </button>
-            <button
-              type="button"
-              onclick="reiniciarADatosIniciales()"
-              class="bg-slate-500 text-white text-xs font-bold min-h-[44px] px-3.5 py-2 rounded-md hover:bg-slate-600 transition shadow-sm"
-            >
-              🔄 Reiniciar Demo
-            </button>
-          </div>
+      <div class="flex flex-col gap-3 mb-4">
+        <div class="min-w-0">
+          <h1 class="text-lg sm:text-xl font-bold text-gastro-primary">
+            GastroBA
+            <span class="text-[10px] sm:text-xs font-semibold text-gastro-accent px-2 py-0.5 bg-gastro-subtle rounded-md ml-1 align-middle">RRHH</span>
+          </h1>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Visualización en tiempo real de las pestañas de Google Sheets.
+          </p>
         </div>
 
-        <div
-          class="tabla-wrap bg-white border border-gastro-border rounded-xl shadow-sm overflow-x-auto"
-        >
-          <table class="tabla-vacantes w-full text-left border-collapse text-xs lg:min-w-[1100px]">
-            <thead>
-              <tr
-                class="bg-gastro-subtle border-b border-gastro-border text-gastro-primary font-bold uppercase tracking-wider text-[11px]"
-              >
-                <th class="p-3">Capacitador</th>
-                <th class="p-3">Regional</th>
-                <th class="p-3">Zonal</th>
-                <th class="p-3">Local</th>
-                <th class="p-3 w-28">Puesto / Turno</th>
-                <th class="p-3">Notas Solicitud</th>
-                <th class="p-3">Fecha Jornada</th>
-                <th class="p-3 w-28">Hora</th>
-                <th class="p-3">Estado</th>
-                <th class="p-3">Fecha Ingreso</th>
-                <th class="p-3">Postulante Asignado</th>
-                <th class="p-3 text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody
-              id="body-tabla-vacantes"
-              class="divide-y divide-gastro-border"
+        <nav class="flex flex-wrap items-center gap-2 border-b border-gastro-border pb-3" aria-label="Secciones">
+          <button
+            type="button"
+            onclick="cambiarMarcaVacante('SABORES')"
+            id="tab-sabores"
+            class="tab-marca active-tab text-xs font-bold px-4 py-2 rounded-lg border border-gastro-border transition flex items-center gap-1.5"
+          >
+            <span>🍦</span> VACANTES SABORES
+          </button>
+          <button
+            type="button"
+            onclick="cambiarMarcaVacante('EXTREMAS')"
+            id="tab-extremas"
+            class="tab-marca text-xs font-bold px-4 py-2 rounded-lg border border-gastro-border bg-white text-slate-600 hover:bg-gastro-subtle transition flex items-center gap-1.5"
+          >
+            <span>⚡</span> VACANTES EXTREMAS
+          </button>
+          <button
+            type="button"
+            onclick="mostrarSeccion('pendientes-asignacion')"
+            class="nav-btn text-xs font-bold px-4 py-2 rounded-lg border border-gastro-border bg-white text-slate-600 hover:bg-gastro-subtle transition inline-flex items-center gap-1.5"
+            data-seccion="pendientes-asignacion"
+          >
+            📥 Ingresos
+            <span
+              class="badge-pendientes bg-rose-500 text-white rounded-full text-[10px] font-bold px-1.5 py-0.5 min-w-[1.15rem] text-center"
+              >0</span
             >
-              <!-- JS -->
-            </tbody>
-          </table>
+          </button>
+          <button
+            type="button"
+            onclick="mostrarSeccion('configuracion')"
+            class="nav-btn text-xs font-bold px-4 py-2 rounded-lg border border-gastro-border bg-white text-slate-600 hover:bg-gastro-subtle transition"
+            data-seccion="configuracion"
+          >
+            ⚙️ Configuración
+          </button>
+        </nav>
+      </div>
+
+      <!-- VISTA OPERATIVA (VACANTES SABORES / EXTREMAS) -->
+      <section id="vista-operativa" class="seccion-content block">
+        <!-- Contenedor Principal de Tarjetas de Vacantes -->
+        <div id="contenedor-tarjetas-vacantes" class="space-y-3">
+          <!-- JS insertará dinámicamente cada Ficha -->
+        </div>
+
+        <!-- Barra Inferior de Paginación -->
+        <div class="mt-5 bg-white border border-gastro-border rounded-xl p-3 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-slate-600">
+          <div class="flex items-center gap-2">
+            <span>Mostrar</span>
+            <select class="cell-select w-20 text-xs" id="select-tamano-pagina" onchange="cambiarTamanoPagina(this.value)">
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+            <span>por página</span>
+          </div>
+
+          <div class="font-semibold text-gastro-primary" id="info-paginacion">
+            Cargando registros...
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button type="button" class="px-3 py-1.5 bg-gastro-subtle text-gastro-primary font-bold rounded-md hover:bg-gastro-border transition disabled:opacity-50" id="btn-pag-anterior">
+              ◀ Anterior
+            </button>
+            <button type="button" class="px-3 py-1.5 bg-gastro-subtle text-gastro-primary font-bold rounded-md hover:bg-gastro-border transition disabled:opacity-50" id="btn-pag-siguiente">
+              Siguiente ▶
+            </button>
+          </div>
         </div>
       </section>
 
-      <!-- PENDIENTES DE ASIGNACIÓN -->
+      <!-- PENDIENTES DE ASIGNACIÓN (BD INGRESO) -->
       <section id="pendientes-asignacion" class="seccion-content hidden">
         <div class="mb-5">
           <h2 class="text-lg sm:text-xl font-bold text-gastro-primary">
-            📥 Postulantes Pendientes de Asignación
+            Ingresos
           </h2>
-          <p class="text-xs text-slate-500 mt-0.5">
-            Postulaciones recibidas mediante el Formulario General. Asígnalas
-            manualmente a la vacante correspondiente.
-          </p>
         </div>
 
         <div
@@ -198,424 +149,279 @@
             ⚙️ Configuración del Sistema
           </h2>
           <p class="text-xs text-slate-500 mt-0.5">
-            Gestiona los catálogos base del sistema.
+            Catálogos base de la plataforma.
           </p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div
-            class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm"
-          >
-            <h3 class="font-bold text-gastro-primary text-sm mb-3">
-              📍 Locales y Direcciones
-            </h3>
-            <form
-              onsubmit="guardarLocal(event)"
-              class="flex flex-col gap-2 mb-3"
-            >
-              <input
-                type="text"
-                id="loc-nombre"
-                placeholder="Nombre Local"
-                class="input-clean"
-                required
-              />
-              <input
-                type="text"
-                id="loc-direccion"
-                placeholder="Dirección exacta"
-                class="input-clean"
-                required
-              />
-              <button
-                type="submit"
-                class="bg-gastro-accent text-white text-xs font-bold min-h-[44px] py-2 rounded-md hover:bg-gastro-primary transition"
-              >
-                + Agregar Local
-              </button>
-            </form>
-            <ul
-              id="lista-locales"
-              class="divide-y divide-slate-100 max-h-44 overflow-y-auto"
-            ></ul>
+          <div class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm">
+            <h3 class="font-bold text-gastro-primary text-sm mb-2">📍 Locales</h3>
+            <p class="text-xs text-slate-500">Los locales son administrados directamente desde la hoja de Google Sheets.</p>
           </div>
-
-          <div
-            class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm"
-          >
-            <h3 class="font-bold text-gastro-primary text-sm mb-3">
-              👤 Capacitadores RRHH
-            </h3>
-            <form
-              onsubmit="guardarCapacitador(event)"
-              class="flex flex-col gap-2 mb-3"
-            >
-              <input
-                type="text"
-                id="cap-nombre"
-                placeholder="Nombre completo"
-                class="input-clean"
-                required
-              />
-              <button
-                type="submit"
-                class="bg-gastro-accent text-white text-xs font-bold min-h-[44px] py-2 rounded-md hover:bg-gastro-primary transition"
-              >
-                + Agregar Capacitador
-              </button>
-            </form>
-            <ul
-              id="lista-capacitadores"
-              class="divide-y divide-slate-100 max-h-44 overflow-y-auto"
-            ></ul>
+          <div class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm">
+            <h3 class="font-bold text-gastro-primary text-sm mb-2">👤 Capacitadores</h3>
+            <p class="text-xs text-slate-500">Listado sincrónico con las hojas VACANTES SABORES y VACANTES EXTREMAS.</p>
           </div>
-
-          <div
-            class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm"
-          >
-            <h3 class="font-bold text-gastro-primary text-sm mb-3">
-              ⏰ Horarios de Jornada
-            </h3>
-            <form
-              onsubmit="guardarHorario(event)"
-              class="flex flex-col gap-2 mb-3"
-            >
-              <input type="time" id="hor-valor" class="input-clean" required />
-              <button
-                type="submit"
-                class="bg-gastro-accent text-white text-xs font-bold min-h-[44px] py-2 rounded-md hover:bg-gastro-primary transition"
-              >
-                + Agregar Horario
-              </button>
-            </form>
-            <ul
-              id="lista-horarios"
-              class="divide-y divide-slate-100 max-h-44 overflow-y-auto"
-            ></ul>
+          <div class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm">
+            <h3 class="font-bold text-gastro-primary text-sm mb-2">⏰ Horarios</h3>
+            <p class="text-xs text-slate-500">Sincronizados según registros de jornada.</p>
           </div>
-
-          <div
-            class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm flex flex-col gap-3"
-          >
-            <h3 class="font-bold text-gastro-primary text-sm">
-              🌍 Regionales y Zonales
-            </h3>
-            <div
-              class="bg-gastro-subtle p-3 rounded-lg border border-gastro-border"
-            >
-              <h4 class="font-semibold text-xs text-gastro-primary mb-1">
-                Regionales
-              </h4>
-              <form onsubmit="guardarRegional(event)" class="flex gap-2">
-                <input
-                  type="text"
-                  id="reg-nombre"
-                  placeholder="Ej. CABA"
-                  class="input-clean"
-                  required
-                />
-                <button
-                  type="submit"
-                  class="bg-gastro-accent text-white font-bold min-h-[44px] min-w-[44px] px-3 text-xs rounded-md shrink-0"
-                >
-                  +
-                </button>
-              </form>
-              <ul
-                id="lista-regionales"
-                class="divide-y divide-slate-200 mt-2 max-h-24 overflow-y-auto"
-              ></ul>
-            </div>
-
-            <div
-              class="bg-gastro-subtle p-3 rounded-lg border border-gastro-border"
-            >
-              <h4 class="font-semibold text-xs text-gastro-primary mb-1">
-                Zonales
-              </h4>
-              <form onsubmit="guardarZonal(event)" class="flex gap-2">
-                <input
-                  type="text"
-                  id="zon-nombre"
-                  placeholder="Ej. Norte"
-                  class="input-clean"
-                  required
-                />
-                <button
-                  type="submit"
-                  class="bg-gastro-accent text-white font-bold min-h-[44px] min-w-[44px] px-3 text-xs rounded-md shrink-0"
-                >
-                  +
-                </button>
-              </form>
-              <ul
-                id="lista-zonales"
-                class="divide-y divide-slate-200 mt-2 max-h-24 overflow-y-auto"
-              ></ul>
-            </div>
+          <div class="bg-white p-4 rounded-xl border border-gastro-border shadow-sm">
+            <h3 class="font-bold text-gastro-primary text-sm mb-2">🌍 Regionales / Zonales</h3>
+            <p class="text-xs text-slate-500">Gestión de áreas operativas.</p>
           </div>
         </div>
       </section>
+    </main>
 
-      <!-- FORMULARIO POSTULANTE -->
-      <section id="simulador-postulante" class="seccion-content hidden">
-        <div
-          class="bg-white p-4 sm:p-6 md:p-8 rounded-2xl border border-gastro-border max-w-3xl mx-auto shadow-sm"
-        >
-          <h2 class="text-lg sm:text-xl font-bold text-gastro-primary">
-            📝 Formulario General de Ingreso
-          </h2>
-          <p class="text-xs text-slate-500 mb-6">
-            Completa tus datos personales para el proceso de selección.
-          </p>
+    <div id="modal-operativa" class="modal-overlay hidden" aria-hidden="true">
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-operativa-titulo">
+        <div class="modal-header">
+          <div>
+            <h2 id="modal-operativa-titulo" class="modal-titulo">Editar vacante</h2>
+            <p id="modal-operativa-subtitulo" class="modal-subtitulo"></p>
+          </div>
+          <button type="button" class="btn-icono" onclick="cerrarEditorOperativa()" aria-label="Cerrar" title="Cerrar">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
 
-          <form
-            id="form-postulante"
-            novalidate
-            onsubmit="enviarFormularioPostulante(event)"
-            class="grid grid-cols-1 md:grid-cols-2 gap-4"
-          >
+        <form id="form-operativa" class="modal-form" onsubmit="guardarEditorOperativa(event)">
+          <input type="hidden" id="edit-row-id" />
+
+          <div class="modal-grid">
             <div>
-              <label class="label-form" for="post-nombre">Nombre/s</label>
-              <input
-                type="text"
-                id="post-nombre"
-                name="nombre"
-                placeholder="Juan"
-                class="input-clean"
-                autocomplete="given-name"
-                maxlength="60"
-                aria-describedby="post-nombre-error"
-              />
-              <p id="post-nombre-error" class="msg-campo" aria-live="polite"></p>
+              <label class="label-form" for="edit-capacitador">Capacitador (A)</label>
+              <input type="text" id="edit-capacitador" class="input-clean" />
             </div>
             <div>
-              <label class="label-form" for="post-apellido">Apellido/s</label>
-              <input
-                type="text"
-                id="post-apellido"
-                name="apellido"
-                placeholder="Pérez"
-                class="input-clean"
-                autocomplete="family-name"
-                maxlength="60"
-                aria-describedby="post-apellido-error"
-              />
-              <p id="post-apellido-error" class="msg-campo" aria-live="polite"></p>
+              <label class="label-form" for="edit-regional">Regional (B)</label>
+              <input type="text" id="edit-regional" class="input-clean" />
             </div>
             <div>
-              <label class="label-form" for="post-telefono">Teléfono Celular</label>
-              <input
-                type="text"
-                id="post-telefono"
-                name="telefono"
-                inputmode="numeric"
-                placeholder="1112345678"
-                class="input-clean"
-                autocomplete="tel"
-                maxlength="15"
-                aria-describedby="post-telefono-error"
-              />
-              <p id="post-telefono-error" class="msg-campo" aria-live="polite"></p>
+              <label class="label-form" for="edit-zonal">Zonal (C)</label>
+              <input type="text" id="edit-zonal" class="input-clean" />
             </div>
             <div>
-              <label class="label-form" for="post-tel-emergencia"
-                >Teléfono de Emergencia</label
-              >
-              <input
-                type="text"
-                id="post-tel-emergencia"
-                name="tel_emergencia"
-                inputmode="numeric"
-                placeholder="1187654321"
-                class="input-clean"
-                maxlength="15"
-                aria-describedby="post-tel-emergencia-error"
-              />
-              <p id="post-tel-emergencia-error" class="msg-campo" aria-live="polite"></p>
+              <label class="label-form" for="edit-local">Local (D)</label>
+              <input type="text" id="edit-local" class="input-clean" />
+            </div>
+            <div class="modal-grid-full">
+              <label class="label-form" for="edit-local-entrenamiento">Local entrenamiento (E)</label>
+              <input type="text" id="edit-local-entrenamiento" class="input-clean" />
             </div>
             <div>
-              <label class="label-form" for="post-fecha-nac"
-                >Fecha de Nacimiento</label
-              >
-              <input
-                type="date"
-                id="post-fecha-nac"
-                name="fecha_nacimiento"
-                class="input-clean"
-                autocomplete="bday"
-                aria-describedby="post-fecha-nac-error"
-              />
-              <p id="post-fecha-nac-error" class="msg-campo" aria-live="polite"></p>
+              <label class="label-form" for="edit-part">Part (F)</label>
+              <input type="text" id="edit-part" class="input-clean" />
             </div>
             <div>
-              <label class="label-form" for="post-nacionalidad">Nacionalidad</label>
-              <input
-                type="text"
-                id="post-nacionalidad"
-                name="nacionalidad"
-                placeholder="Argentina"
-                class="input-clean"
-                maxlength="40"
-                aria-describedby="post-nacionalidad-error"
-              />
-              <p id="post-nacionalidad-error" class="msg-campo" aria-live="polite"></p>
+              <label class="label-form" for="edit-full">Full (G)</label>
+              <input type="text" id="edit-full" class="input-clean" />
             </div>
             <div>
-              <label class="label-form" for="post-cuil">CUIL</label>
-              <input
-                type="text"
-                id="post-cuil"
-                name="cuil"
-                inputmode="numeric"
-                placeholder="20-12345678-9"
-                class="input-clean"
-                maxlength="13"
-                aria-describedby="post-cuil-error"
-              />
-              <p id="post-cuil-error" class="msg-campo" aria-live="polite"></p>
+              <label class="label-form" for="edit-notas">Notas / Turno (H)</label>
+              <input type="text" id="edit-notas" class="input-clean" />
             </div>
             <div>
-              <label class="label-form" for="post-sexo">Sexo</label>
-              <select
-                id="post-sexo"
-                name="sexo"
-                class="input-clean"
-                aria-describedby="post-sexo-error"
-              >
+              <label class="label-form" for="edit-fecha">Fecha jornada (I)</label>
+              <input type="date" id="edit-fecha" class="input-clean" />
+            </div>
+            <div>
+              <label class="label-form" for="edit-hora">Hora jornada (J)</label>
+              <input type="time" id="edit-hora" class="input-clean" />
+            </div>
+            <div>
+              <label class="label-form" for="edit-fecha-ingreso">Fecha ingreso (M)</label>
+              <input type="date" id="edit-fecha-ingreso" class="input-clean" />
+            </div>
+            <div class="modal-checks modal-grid-full">
+              <label class="modal-check">
+                <input type="checkbox" id="edit-huella" />
+                <span>Huella (K)</span>
+              </label>
+              <label class="modal-check">
+                <input type="checkbox" id="edit-enviado" />
+                <span>Enviado (L)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-icono" onclick="cerrarEditorOperativa()" aria-label="Cancelar" title="Cancelar">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button type="submit" class="btn-icono btn-icono-primary" aria-label="Guardar cambios" title="Guardar">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="modal-postulante" class="modal-overlay hidden" aria-hidden="true">
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-postulante-titulo">
+        <div class="modal-header">
+          <div>
+            <h2 id="modal-postulante-titulo" class="modal-titulo">Editar candidato</h2>
+            <p id="modal-postulante-subtitulo" class="modal-subtitulo"></p>
+          </div>
+          <button type="button" class="btn-icono" onclick="cerrarEditorPostulante()" aria-label="Cerrar" title="Cerrar">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <form id="form-postulante-vacante" class="modal-form" onsubmit="guardarEditorPostulante(event)">
+          <input type="hidden" id="edit-cand-row-id" />
+
+          <div class="modal-grid">
+            <div>
+              <label class="label-form" for="edit-cand-nombre">Nombre (N)</label>
+              <input type="text" id="edit-cand-nombre" class="input-clean" />
+            </div>
+            <div>
+              <label class="label-form" for="edit-cand-apellido">Apellido (O)</label>
+              <input type="text" id="edit-cand-apellido" class="input-clean" />
+            </div>
+            <div>
+              <label class="label-form" for="edit-cand-tel">Teléfono (P)</label>
+              <input type="text" id="edit-cand-tel" class="input-clean" />
+            </div>
+            <div>
+              <label class="label-form" for="edit-cand-tel-emergencia">Tel. emergencia (Q)</label>
+              <input type="text" id="edit-cand-tel-emergencia" class="input-clean" />
+            </div>
+            <div>
+              <label class="label-form" for="edit-cand-fecha-nac">Fecha nacimiento (R)</label>
+              <input type="date" id="edit-cand-fecha-nac" class="input-clean" />
+            </div>
+            <div>
+              <label class="label-form" for="edit-cand-nac">Nacionalidad (S)</label>
+              <input type="text" id="edit-cand-nac" class="input-clean" />
+            </div>
+            <div>
+              <label class="label-form" for="edit-cand-cuil">CUIL (T)</label>
+              <input type="text" id="edit-cand-cuil" class="input-clean" />
+            </div>
+            <div>
+              <label class="label-form" for="edit-cand-sexo">Sexo (U)</label>
+              <select id="edit-cand-sexo" class="input-clean">
                 <option value="">Seleccionar...</option>
                 <option value="Masculino">Masculino</option>
                 <option value="Femenino">Femenino</option>
                 <option value="Otro">Otro</option>
               </select>
-              <p id="post-sexo-error" class="msg-campo" aria-live="polite"></p>
             </div>
-            <div class="md:col-span-2">
-              <label class="label-form" for="post-direccion"
-                >Dirección Completa del Domicilio</label
-              >
-              <input
-                type="text"
-                id="post-direccion"
-                name="direccion"
-                placeholder="Av. Corrientes 1234, CABA"
-                class="input-clean"
-                autocomplete="street-address"
-                maxlength="120"
-                aria-describedby="post-direccion-error"
-              />
-              <p id="post-direccion-error" class="msg-campo" aria-live="polite"></p>
+            <div class="modal-grid-full">
+              <label class="label-form" for="edit-cand-direccion">Dirección (V)</label>
+              <input type="text" id="edit-cand-direccion" class="input-clean" />
             </div>
             <div>
-              <label class="label-form" for="post-cp">Código Postal (CP)</label>
-              <input
-                type="text"
-                id="post-cp"
-                name="cp"
-                inputmode="numeric"
-                placeholder="1425"
-                class="input-clean"
-                autocomplete="postal-code"
-                maxlength="8"
-                aria-describedby="post-cp-error"
-              />
-              <p id="post-cp-error" class="msg-campo" aria-live="polite"></p>
+              <label class="label-form" for="edit-cand-cp">CP (W)</label>
+              <input type="text" id="edit-cand-cp" class="input-clean" />
             </div>
             <div>
-              <label class="label-form" for="post-localidad">Localidad</label>
-              <input
-                type="text"
-                id="post-localidad"
-                name="localidad"
-                placeholder="CABA"
-                class="input-clean"
-                autocomplete="address-level2"
-                maxlength="60"
-                aria-describedby="post-localidad-error"
-              />
-              <p id="post-localidad-error" class="msg-campo" aria-live="polite"></p>
+              <label class="label-form" for="edit-cand-localidad">Localidad (X)</label>
+              <input type="text" id="edit-cand-localidad" class="input-clean" />
             </div>
-            <div class="md:col-span-2">
-              <label class="label-form" for="post-email"
-                >Correo Electrónico (E-mail)</label
-              >
-              <input
-                type="text"
-                id="post-email"
-                name="email"
-                inputmode="email"
-                placeholder="juan.perez@email.com"
-                class="input-clean"
-                autocomplete="email"
-                maxlength="80"
-                aria-describedby="post-email-error"
-              />
-              <p id="post-email-error" class="msg-campo" aria-live="polite"></p>
+            <div class="modal-grid-full">
+              <label class="label-form" for="edit-cand-email">Email (Y)</label>
+              <input type="email" id="edit-cand-email" class="input-clean" />
             </div>
-            <p
-              id="form-postulante-resumen"
-              class="msg-campo md:col-span-2"
-              aria-live="polite"
-            ></p>
-            <button
-              type="submit"
-              class="md:col-span-2 mt-1 sm:mt-2 bg-emerald-600 text-white font-bold min-h-[48px] py-3 rounded-lg hover:bg-emerald-700 transition shadow"
-            >
-              🚀 Enviar Formulario
+            <div>
+              <label class="label-form" for="edit-cand-altas">Altas RRHH (Z)</label>
+              <input type="text" id="edit-cand-altas" class="input-clean" />
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-icono" onclick="cerrarEditorPostulante()" aria-label="Cancelar" title="Cancelar">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+              </svg>
             </button>
-          </form>
+            <button type="submit" class="btn-icono btn-icono-primary" aria-label="Guardar candidato" title="Guardar">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="modal-reasignar" class="modal-overlay hidden" aria-hidden="true">
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-reasignar-titulo">
+        <div class="modal-header">
+          <div>
+            <h2 id="modal-reasignar-titulo" class="modal-titulo">Reasignar candidato</h2>
+            <p id="modal-reasignar-subtitulo" class="modal-subtitulo"></p>
+          </div>
+          <button type="button" class="btn-icono" onclick="cerrarModalReasignar()" aria-label="Cerrar" title="Cerrar">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+            </svg>
+          </button>
         </div>
-      </section>
-    </main>
 
-    <nav
-      class="nav-movil md:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gastro-border shadow-[0_-4px_12px_rgba(18,40,82,0.08)] grid grid-cols-4"
-      aria-label="Navegación principal"
+        <form id="form-reasignar" class="modal-form" onsubmit="guardarReasignacion(event)">
+          <input type="hidden" id="reasignar-row-origen" />
+          <div>
+            <label class="label-form" for="reasignar-row-destino">Vacante destino (marca activa)</label>
+            <select id="reasignar-row-destino" class="input-clean" required>
+              <option value="">Elegir vacante destino...</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn-icono" onclick="cerrarModalReasignar()" aria-label="Cancelar" title="Cancelar">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button type="submit" class="btn-icono btn-icono-primary" aria-label="Reasignar" title="Reasignar">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M7 7H20M7 7L11 3M7 7L11 11" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M17 17H4M17 17L13 21M17 17L13 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <button
+      type="button"
+      id="btn-sync-flotante"
+      class="btn-icono btn-sync-flotante"
+      onclick="cargarDatosDesdeBackend({ manual: true })"
+      aria-label="Sincronizar con Google Sheets"
+      title="Sincronizar"
     >
-      <button
-        type="button"
-        onclick="mostrarSeccion('vista-operativa')"
-        class="nav-btn flex flex-col items-center justify-center gap-0.5 min-h-[56px] px-1 py-2 text-[10px] font-semibold text-slate-500 active-nav"
-        data-seccion="vista-operativa"
-      >
-        <span class="text-base leading-none" aria-hidden="true">📋</span>
-        Operativa
-      </button>
-      <button
-        type="button"
-        onclick="mostrarSeccion('pendientes-asignacion')"
-        class="nav-btn relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] px-1 py-2 text-[10px] font-semibold text-slate-500"
-        data-seccion="pendientes-asignacion"
-      >
-        <span class="text-base leading-none" aria-hidden="true">📥</span>
-        <span class="inline-flex items-center gap-1">
-          Pendientes
-          <span
-            class="badge-pendientes bg-rose-500 text-white rounded-full text-[9px] font-bold px-1.5 min-w-[1rem] text-center"
-            >0</span
-          >
-        </span>
-      </button>
-      <button
-        type="button"
-        onclick="mostrarSeccion('configuracion')"
-        class="nav-btn flex flex-col items-center justify-center gap-0.5 min-h-[56px] px-1 py-2 text-[10px] font-semibold text-slate-500"
-        data-seccion="configuracion"
-      >
-        <span class="text-base leading-none" aria-hidden="true">⚙️</span>
-        Config
-      </button>
-      <button
-        type="button"
-        onclick="mostrarSeccion('simulador-postulante')"
-        class="nav-btn flex flex-col items-center justify-center gap-0.5 min-h-[56px] px-1 py-2 text-[10px] font-semibold text-slate-500"
-        data-seccion="simulador-postulante"
-      >
-        <span class="text-base leading-none" aria-hidden="true">📱</span>
-        Ingreso
-      </button>
-    </nav>
+      <svg class="btn-sync-icono" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M20 12a8 8 0 1 1-2.34-5.66"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+        />
+        <path
+          d="M20 4v5h-5"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
 
+    <!-- Contenedor Flotante para Avisos -->
     <div id="aviso-sistema" class="aviso-sistema" role="status" aria-live="polite"></div>
 
     <script src="app.js"></script>
